@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: fffb7c7af069a8e4ebddb868bfae017b
+  - enabled: 1
+    path: Assets/Scenes/W0_Base.unity
+    guid: a94b5e6b261bc7f488e5492e855d7e26
+  - enabled: 1
+    path: Assets/Scenes/W1_Hospital.unity
+    guid: e412a566eea97fb4f9692f88d24a27b4
+  - enabled: 1
+    path: Assets/Scenes/W2_Wasteland.unity
+    guid: 08c24ecdb3cf9894e9ba76f8c329bf24
+  - enabled: 1
+    path: Assets/Scenes/W3_Subway.unity
+    guid: 29e3c257829d4bc43b1fa4add35d902b
+  - enabled: 1
+    path: Assets/Scenes/W4_NeonStreet.unity
+    guid: 8ef509cbde7c8124b87b8177e934a14d
+  - enabled: 1
+    path: Assets/Scenes/W5_AlienGate.unity
+    guid: 6fae639399887274e9192cc3874f19e3
+  - enabled: 1
+    path: Assets/Scenes/W1_Sandbox.unity
+    guid: 36d6287fdd325ed4787cf2f88a89853d
+  m_configObjects: {}
