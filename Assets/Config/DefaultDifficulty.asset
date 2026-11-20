@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38cad42559b9a094baa9523894db082b, type: 3}
+  m_Name: DefaultDifficulty
+  m_EditorClassIdentifier: 
+  maxHealth: 900
+  huntSpeed: 2.8
+  rageSpeed: 4.6
+  rageThreshold: 0.55
+  stopDistance: 1.9
+  wakeRadius: 15
+  wakeSightRange: 24
+  wakeDelay: 1.2
+  maxValue: 100
+  gazeRate: 12
+  recoverRate: 8
+  struggleRequired: 5
+  autoRelease: 5.5
+  petrifyIsLethal: 1
+  lethalHold: 0.3
+  centerWeight: 1.55
+  edgeWeight: 0.92
+  closeRangeStart: 2
+  closeRangeEnd: 7
+  closeWeightFactor: 0.55
+  rageRateMultiplier: 1.35
