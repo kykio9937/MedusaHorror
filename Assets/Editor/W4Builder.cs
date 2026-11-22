@@ -409,6 +409,12 @@ namespace MedusaHorror.EditorTools
             var savePoint = (bedT != null ? bedT.gameObject : house.gameObject).AddComponent<MedusaHorror.Gameplay.HouseSavePoint>();
             savePoint.houseId = "W4_Apartment_7B";
 
+            // 自由布置家具：屋内按 B 打开建造菜单
+            var buildMode = house.AddComponent<MedusaHorror.Gameplay.HouseBuildMode>();
+            buildMode.houseId = "W4_Apartment_7B";
+            buildMode.houseCenter = new Vector3(hx, 0f, hz);
+            buildMode.houseRadius = 20f;
+
             var chest = LevelKit.Slab("HouseChest", house.transform, new Vector3(hx - 2.0f, 0.35f, hz + 2.6f),
                 new Vector3(0.9f, 0.7f, 0.6f), floorMat);
             var storage = chest.AddComponent<MedusaHorror.Gameplay.HouseStorage>();

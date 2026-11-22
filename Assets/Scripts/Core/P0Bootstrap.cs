@@ -99,6 +99,19 @@ namespace MedusaHorror.Core
             var playerPanel = PlayerPanel.Ensure();
             playerPanel.SetShown(!inMenu);
 
+            // NPC 外观差异化：同一个模型也能看出是不同的人
+            SetupNpcVariation();
+
+            // 玩家外观配色（V 键切换，不改骨骼与武器绑定）
+            var pcSkin = Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(true);
+            if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Player.PlayerSkin>() == null)
+                pcSkin.gameObject.AddComponent<MedusaHorror.Player.PlayerSkin>();
+
+            // 等级 / 经验：老存档按等级补齐解锁，HUD 常驻左下角
+            Progression.SyncUnlocks();
+            var expHud = ExpHud.Ensure();
+            expHud.SetShown(!inMenu);
+
             // 反射探针：整搬进来的场景带实时探针，每帧渲染 6 面非常吃性能。
             // 统一改为按需刷新，并在加载后只渲染一次。
             var probes = Object.FindObjectsOfType<ReflectionProbe>(true);
@@ -109,6 +122,53 @@ namespace MedusaHorror.Core
                 p.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
                 p.RenderProbe();
             }
+        }
+
+        // ---------------- NPC 外观差异化 ----------------
+
+        static void SetupNpcVariation()
+        {
+            var markers = new System.Collections.Generic.List<GameObject>();
+
+            var quest = Object.FindObjectsOfType<MedusaHorror.Gameplay.NpcQuestGiver>(true);
+            for (int i = 0; i < quest.Length; i++)
+                if (quest[i] != null) markers.Add(quest[i].gameObject);
+
+            var crowd = Object.FindObjectsOfType<MedusaHorror.Gameplay.CrowdWalker>(true);
+            for (int i = 0; i < crowd.Length; i++)
+                if (crowd[i] != null) markers.Add(crowd[i].gameObject);
+
+            // 名字里带这些词的也算 NPC（Builder 生成的村民/租客）
+            var all = Object.FindObjectsOfType<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                var t = all[i];
+                if (t == null) continue;
+                string n = t.name;
+                if (n.IndexOf("CrowdWalker", System.StringComparison.Ordinal) >= 0
+                    || n.IndexOf("HouseTenant", System.StringComparison.Ordinal) >= 0
+                    || n.IndexOf("Villager", System.StringComparison.Ordinal) >= 0
+                    || n.IndexOf("Npc", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (!markers.Contains(t.gameObject)) markers.Add(t.gameObject);
+                }
+            }
+
+            int added = 0;
+            for (int i = 0; i < markers.Count; i++)
+            {
+                var go = markers[i];
+                if (go == null) continue;
+                // 玩家自己有控制器，跳过
+                if (go.GetComponent<MedusaHorror.Player.ThirdPersonController>() != null) continue;
+                if (go.GetComponent<MedusaHorror.Gameplay.PlayerPetrify>() != null) continue;
+                if (go.GetComponent<MedusaHorror.Gameplay.NpcVariation>() != null) continue;
+
+                var v = go.AddComponent<MedusaHorror.Gameplay.NpcVariation>();
+                v.seed = go.GetInstanceID();
+                added++;
+            }
+            if (added > 0) Debug.Log("[P0] NPC 外观差异化：" + added + " 个");
         }
 
         // ---------------- 关卡目标（探索关卡占位） ----------------

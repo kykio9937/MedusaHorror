@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using MedusaHorror.Gameplay;
 
@@ -95,6 +95,7 @@ namespace MedusaHorror.Player
         {
             _input = GetComponent<InputReader>();
             if (viewCamera == null) viewCamera = Camera.main;
+            magazineSize += MedusaHorror.Core.Progression.LevelMagBonus;   // 等级解锁的弹匣扩容
             _ammo = magazineSize;
             BuildRig();
         }
@@ -387,7 +388,7 @@ namespace MedusaHorror.Player
             }
 
             Ray ray = new Ray(origin, dir);
-            var hits = Physics.RaycastAll(ray, range, ~0, QueryTriggerInteraction.Ignore);
+            var hits = Physics.RaycastAll(ray, range, ~0, QueryTriggerInteraction.Collide);
             if (hits == null || hits.Length == 0) return;
 
             float bestDist = float.MaxValue;
@@ -407,10 +408,10 @@ namespace MedusaHorror.Player
             LastHitName = best.collider.name;
             LastHitDistance = bestDist;
 
-            var boss = best.collider.GetComponentInParent<MedusaBoss>();
-            if (boss != null)
+            var target = best.collider.GetComponentInParent<MedusaHorror.Gameplay.IDamageable>();
+            if (target != null && !target.IsDead)
             {
-                boss.TakeDamage(damage * MedusaHorror.Core.PlayerStats.DamageMultiplier);
+                target.TakeDamage(damage * MedusaHorror.Core.PlayerStats.DamageMultiplier);
                 return;
             }
 

@@ -87,6 +87,7 @@ namespace MedusaHorror.Gameplay
         {
             if (profile == null) profile = DifficultyProfile.Active;
             if (profile != null) profile.ApplyToPetrify(this);
+            maxValue += MedusaHorror.Core.PlayerStats.PetrifyCapBonus;   // 等级带来的上限提升
 
             controller = GetComponent<CharacterController>();
             input = GetComponent<InputReader>();

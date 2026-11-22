@@ -9,8 +9,10 @@ namespace MedusaHorror.Gameplay
     /// Dormant 期间 MedusaGaze 关闭，玩家可以自由探索；苏醒后开始追猎并持续用凝视累积石化。
     /// </summary>
     [DisallowMultipleComponent]
-    public class MedusaBoss : MonoBehaviour
+    public class MedusaBoss : MonoBehaviour, IDamageable
     {
+        /// <summary>IDamageable：供武器统一判定。</summary>
+        public Transform Transform { get { return transform; } }
         public enum State { Dormant, Alert, Hunt, Dead }
 
         [Tooltip("难度配置资产（唯一数据源）：运行时用它覆盖下面的字段，改数值请改资产")]

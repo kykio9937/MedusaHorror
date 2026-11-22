@@ -38,6 +38,7 @@ namespace MedusaHorror.UI
         };
 
         int _page;
+        int _bagFilter;
         bool _open;
         bool _shown = true;
         Canvas _canvas;
@@ -46,6 +47,7 @@ namespace MedusaHorror.UI
         Text _hint;
 
         static readonly string[] PageNames = { "属性", "装备", "背包", "帮助" };
+        static readonly string[] BagFilters = { "全部", "消耗", "材料", "任务", "钥匙", "纪念" };
 
         public bool IsOpen { get { return _open; } }
         public int Page { get { return _page; } }
@@ -83,13 +85,20 @@ namespace MedusaHorror.UI
             if (Input.GetKeyDown(KeyCode.Q)) { _page = (_page + PageNames.Length - 1) % PageNames.Length; Refresh(); return; }
             if (Input.GetKeyDown(KeyCode.E)) { _page = (_page + 1) % PageNames.Length; Refresh(); return; }
 
-            // 背包页：数字键使用对应物品
+            // 背包页：F 切分类，数字键使用，Shift+数字丢弃
             if (_page == 2)
             {
+                if (Input.GetKeyDown(KeyCode.F))
+                {
+                    _bagFilter = (_bagFilter + 1) % BagFilters.Length;
+                    Refresh();
+                    return;
+                }
+                bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                 for (int i = 0; i < 9; i++)
                 {
                     if (!Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
-                    UseItem(i);
+                    if (shift) DropItem(i); else UseItem(i);
                     return;
                 }
             }
@@ -117,9 +126,37 @@ namespace MedusaHorror.UI
         }
 
         /// <summary>使用背包第 index 件物品。</summary>
+        List<ItemStack> FilteredItems()
+        {
+            var all = Inventory.Items;
+            if (_bagFilter <= 0) return all;
+            string kind = BagFilters[_bagFilter];
+            var result = new List<ItemStack>();
+            for (int i = 0; i < all.Count; i++)
+                if (all[i].kind == kind) result.Add(all[i]);
+            return result;
+        }
+
+        /// <summary>丢弃背包第 index 件（按当前分类）。</summary>
+        public bool DropItem(int index)
+        {
+            var list = FilteredItems();
+            if (index < 0 || index >= list.Count) { LootToast.Show("这一格是空的。"); return false; }
+            var it = list[index];
+            if (it.kind == "任务" || it.kind == "钥匙")
+            {
+                LootToast.Show("「" + it.name + "」不能丢弃。");
+                return false;
+            }
+            Inventory.Remove(it.id, 1);
+            LootToast.Show("丢掉了「" + it.name + "」×1");
+            Refresh();
+            return true;
+        }
+
         public bool UseItem(int index)
         {
-            var list = Inventory.Items;
+            var list = FilteredItems();
             if (index < 0 || index >= list.Count)
             {
                 LootToast.Show("这一格是空的。");
@@ -174,7 +211,7 @@ namespace MedusaHorror.UI
             if (_body != null) _body.text = BuildPage(_page);
             if (_hint != null)
                 _hint.text = _page == 2
-                    ? "数字键 1-9 使用物品 · Q / E 切换页签 · Tab / Esc 关闭"
+                    ? "数字键 1-9 使用 · Shift+数字 丢弃 · F 切分类 · Q/E 换页 · Tab/Esc 关闭"
                     : "Q / E 切换页签 · Tab / Esc 关闭";
         }
 
@@ -211,6 +248,10 @@ namespace MedusaHorror.UI
             var sb = new StringBuilder();
             sb.AppendLine("属性");
             sb.AppendLine();
+            sb.AppendLine("等级          Lv " + Progression.Level
+                + (Progression.Level >= Progression.MaxLevel ? "（已满级）" : "　经验 " + Mathf.RoundToInt(Progression.Xp) + " / " + Mathf.RoundToInt(Progression.XpToNext)));
+            sb.AppendLine("累计击杀      " + SaveSystem.Data.killCount);
+            sb.AppendLine();
 
             int spd = Mathf.RoundToInt(Mathf.Clamp(d.speedBonus, 0f, 0.5f) * 100f);
             int dmg = Mathf.RoundToInt(Mathf.Clamp(d.damageBonus, 0f, 0.8f) * 100f);
@@ -229,6 +270,20 @@ namespace MedusaHorror.UI
             sb.AppendLine("房屋          " + (d.houses.Count > 0 ? "已购置" : "未购置"));
             sb.AppendLine("已购强化/义体 " + d.shopPurchases.Count + " 件");
             sb.AppendLine("村庄折扣      " + (d.villageDiscount > 0f ? "8.5 折" : "未解锁"));
+            sb.AppendLine();
+            sb.AppendLine("已解锁能力");
+            if (d.unlockedSkills == null || d.unlockedSkills.Count == 0)
+            {
+                sb.AppendLine("  还没有。打怪升级会陆续解锁。");
+            }
+            else
+            {
+                for (int i = 0; i < d.unlockedSkills.Count; i++)
+                {
+                    string id = d.unlockedSkills[i];
+                    sb.AppendLine("  · " + Progression.UnlockName(id) + "　—　" + Progression.UnlockDesc(id));
+                }
+            }
             return sb.ToString();
         }
 
@@ -252,6 +307,7 @@ namespace MedusaHorror.UI
             sb.AppendLine("近战 · 石刃");
             sb.AppendLine("  伤害 " + meleeDmg.ToString("F0") + "  →  实际 " + Mathf.RoundToInt(meleeDmg * dmgMul));
             sb.AppendLine("  攻击距离 " + meleeRange.ToString("F1") + " m · 挥砍 " + meleeInterval.ToString("F2") + " s · 最多命中 " + meleeTargets);
+            sb.AppendLine("  三段连击：斜劈 → 反手横扫 → 重斩（伤害 100% / 118% / 162%）");
             sb.AppendLine();
 
             var gun = FindObjectOfType<PlayerWeapon>(true);
@@ -295,24 +351,34 @@ namespace MedusaHorror.UI
         string BuildInventory()
         {
             var sb = new StringBuilder();
-            var list = Inventory.Items;
-            sb.AppendLine("背包   （" + list.Count + " 种 · " + Inventory.TotalCount + " 件）");
+            var list = FilteredItems();
+
+            var ft = new StringBuilder();
+            for (int i = 0; i < BagFilters.Length; i++)
+            {
+                if (i > 0) ft.Append(" · ");
+                ft.Append(i == _bagFilter ? "【" + BagFilters[i] + "】" : BagFilters[i]);
+            }
+            sb.AppendLine("背包   " + ft);
+            sb.AppendLine("共 " + Inventory.Items.Count + " 种 · " + Inventory.TotalCount + " 件　（F 切换分类）");
             sb.AppendLine();
+
             if (list.Count == 0)
             {
-                sb.AppendLine("空空如也。");
+                sb.AppendLine(_bagFilter == 0 ? "空空如也。" : "这个分类里还没有东西。");
                 sb.AppendLine();
                 sb.AppendLine("任务物品、钥匙、石英粉之类的东西会自动放进这里。");
                 return sb.ToString();
             }
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Count && i < 9; i++)
             {
                 var it = list[i];
                 sb.AppendLine("[" + (i + 1) + "] [" + it.kind + "] " + it.name + " ×" + it.count);
                 if (!string.IsNullOrEmpty(it.desc)) sb.AppendLine("        " + it.desc);
             }
+            if (list.Count > 9) sb.AppendLine("……还有 " + (list.Count - 9) + " 种未显示");
             sb.AppendLine();
-            sb.AppendLine("消耗品按对应数字键使用。");
+            sb.AppendLine("数字键使用 · Shift+数字丢弃（任务物品和钥匙不能丢）");
             return sb.ToString();
         }
 
@@ -331,6 +397,9 @@ namespace MedusaHorror.UI
             sb.AppendLine("E            交互（拾取、对话、传送门、商店、快速旅行）");
             sb.AppendLine("Tab          本面板（打开时角色停止操作）");
             sb.AppendLine("Q / E        面板内切换页签");
+            sb.AppendLine("F            背包内切换分类（消耗/材料/任务/钥匙/纪念）");
+            sb.AppendLine("Shift+数字   丢弃背包物品");
+            sb.AppendLine("B            在自己家里布置家具");
             sb.AppendLine("Esc          关闭面板 / 打开游戏菜单");
             sb.AppendLine();
             sb.AppendLine("小提示：石化满了就完了，被盯住时先跑出视线；身上带着石英粉能救一次。");

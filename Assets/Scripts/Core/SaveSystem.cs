@@ -90,6 +90,15 @@ namespace MedusaHorror.Core
         public float speedBonus = 0f;
         public float damageBonus = 0f;
         public float petrifyResist = 0f;
+
+        [Header("角色成长")]
+        public int level = 1;
+        public float xp = 0f;
+        public int killCount = 0;
+        [Tooltip("已解锁的技能 / 武器 / 坐骑 id")]
+        public List<string> unlockedSkills = new List<string>();
+        [Tooltip("房屋里已摆放的家具：houseId|furnitureId|localX|localY|localZ|yaw")]
+        public List<string> furniturePlaced = new List<string>();
     }
 
     /// <summary>存档槽的只读快照，供主菜单存档页展示，不改变当前槽。</summary>
@@ -257,6 +266,9 @@ namespace MedusaHorror.Core
             if (d.shopPurchases == null) d.shopPurchases = new List<string>();
             if (d.endingsSeen == null) d.endingsSeen = new List<string>();
             if (d.items == null) d.items = new List<ItemStack>();
+            if (d.unlockedSkills == null) d.unlockedSkills = new List<string>();
+            if (d.furniturePlaced == null) d.furniturePlaced = new List<string>();
+            if (d.level < 1) d.level = 1;
         }
 
         static int ReadActiveSlot()

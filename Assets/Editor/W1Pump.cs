@@ -2351,6 +2351,112 @@ public static class W1Pump
             MedusaHorror.Core.SaveSystem.Save();
             return "SETLAST=" + parts[1];
         }
+        if (op == "ADDXP")
+        {
+            float v = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : 100f;
+            MedusaHorror.Core.Progression.AddXp(v);
+            return "[ADDXP] lv=" + MedusaHorror.Core.Progression.Level
+                + " xp=" + MedusaHorror.Core.Progression.Xp.ToString("F0") + "/" + MedusaHorror.Core.Progression.XpToNext.ToString("F0")
+                + " dmgMul=" + MedusaHorror.Core.PlayerStats.DamageMultiplier.ToString("F2")
+                + " spdMul=" + MedusaHorror.Core.PlayerStats.SpeedMultiplier.ToString("F2")
+                + " skills=" + string.Join(",", MedusaHorror.Core.SaveSystem.Data.unlockedSkills.ToArray());
+        }
+        if (op == "PROG")
+        {
+            var d0 = MedusaHorror.Core.SaveSystem.Data;
+            return "[PROG] lv=" + MedusaHorror.Core.Progression.Level + " xp=" + d0.xp.ToString("F0")
+                + " kills=" + d0.killCount + " skills=" + d0.unlockedSkills.Count
+                + " capBonus=" + MedusaHorror.Core.PlayerStats.PetrifyCapBonus.ToString("F0")
+                + " magBonus=" + MedusaHorror.Core.Progression.LevelMagBonus;
+        }
+        if (op == "MONCOUNT")
+        {
+            var ms = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.Monster>();
+            int alive = 0;
+            for (int i = 0; i < ms.Length; i++) if (!ms[i].IsDead) alive++;
+            var sd = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.SiegeDirector>();
+            return "[MONCOUNT] total=" + ms.Length + " alive=" + alive
+                + " siege=" + (sd == null ? "none" : (sd.Status + " wave=" + sd.Wave + " alive=" + sd.AliveCount));
+        }
+        if (op == "KILLALL")
+        {
+            var ms = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.Monster>();
+            int n = 0;
+            for (int i = 0; i < ms.Length; i++) if (!ms[i].IsDead) { ms[i].TakeDamage(99999f); n++; }
+            return "[KILLALL] killed=" + n;
+        }
+        if (op == "SIEGE")
+        {
+            var sd = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.SiegeDirector>();
+            if (sd == null) return "SIEGE=NULL";
+            if (parts.Length > 1 && parts[1].Trim().ToUpperInvariant() == "END") sd.DebugFinish();
+            else sd.DebugStart();
+            return "[SIEGE] " + sd.Status + " running=" + sd.Running + " finished=" + sd.Finished;
+        }
+        if (op == "TRAIN")
+        {
+            var bp = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.TrainBoardPoint>(true);
+            if (bp == null) return "TRAIN=NULL";
+            bp.Interact();
+            var tr = MedusaHorror.Gameplay.TrainRide.Instance;
+            return "[TRAIN] riding=" + (tr != null && tr.Riding);
+        }
+        if (op == "TRAINSTATE")
+        {
+            var tr = MedusaHorror.Gameplay.TrainRide.Instance;
+            if (tr == null) return "TRAINSTATE=NULL";
+            var p = MedusaHorror.Gameplay.PlayerRef.Transform;
+            return "[TRAINSTATE] riding=" + tr.Riding + " player=" + (p == null ? "none" : p.position.ToString("F1"));
+        }
+        if (op == "NPCVAR")
+        {
+            var vs = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.NpcVariation>(true);
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < vs.Length && i < 8; i++)
+                sb.Append(vs[i].name).Append("=").Append(vs[i].DisplayName).Append(" ");
+            var ps = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.PlayerSkin>(true);
+            return "[NPCVAR] count=" + vs.Length + " | " + sb.ToString()
+                + "| skin=" + (ps == null ? "none" : ps.SkinName);
+        }
+        if (op == "COMBO")
+        {
+            var mw = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.MeleeWeapon>(true);
+            if (mw == null) return "COMBO=NULL";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < 3; i++)
+            {
+                mw.Swing();
+                sb.Append("step=").Append(mw.LastComboStep)
+                  .Append(" x").Append(mw.LastDamageMul.ToString("F2"))
+                  .Append(" dmg=").Append(mw.LastSwingDamage.ToString("F0")).Append(" | ");
+            }
+            return "[COMBO] " + sb.ToString();
+        }
+        if (op == "HOMEBUILD")
+        {
+            var bm = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.HouseBuildMode>(true);
+            if (bm == null) return "HOMEBUILD=NULL";
+            if (parts.Length > 1 && parts[1].Trim().ToUpperInvariant() == "CLOSE") { bm.DebugClose(); return "[HOMEBUILD] closed"; }
+            bool ok = bm.DebugOpen();
+            return "[HOMEBUILD] open=" + ok + " owned=" + bm.Owned;
+        }
+        if (op == "HOMEPLACE")
+        {
+            var bm = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.HouseBuildMode>(true);
+            if (bm == null) return "HOMEPLACE=NULL";
+            int idx = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            bool ok = bm.DebugPlace(idx);
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            return "[HOMEPLACE] idx=" + idx + " ok=" + ok + " placed=" + d.furniturePlaced.Count
+                + " coins=" + d.coins + " spdBonus=" + d.speedBonus.ToString("F2");
+        }
+        if (op == "HOMEPUT")
+        {
+            var bm = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.HouseBuildMode>(true);
+            if (bm == null) return "HOMEPUT=NULL";
+            var d0 = MedusaHorror.Core.SaveSystem.Data;
+            return "[HOMEPUT] owned=" + bm.Owned + " placed=" + d0.furniturePlaced.Count;
+        }
         if (op == "COINS")
         {
             if (parts.Length < 2) return "COINS=" + MedusaHorror.Core.Wallet.Coins;

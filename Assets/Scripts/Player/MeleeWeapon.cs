@@ -45,8 +45,25 @@ namespace MedusaHorror.Player
         [Tooltip("上身程序化动作（与剑体摆动共用相位）")]
         public MeleeSwingBody swingBody;
 
+        [Header("三段连击")]
+        [Tooltip("开启后连续点击会依次打出三段不同招式")]
+        public bool useCombo = true;
+        [Tooltip("每段伤害倍率（相对 damage）")]
+        public float[] comboDamageMul = { 1f, 1.18f, 1.62f };
+        [Tooltip("每段最小间隔（秒），越靠后越慢")]
+        public float[] comboInterval = { 0.40f, 0.44f, 0.74f };
+        [Tooltip("每段挥砍时长（秒）")]
+        public float[] comboDuration = { 0.34f, 0.36f, 0.52f };
+        [Tooltip("上一段结束后多久内点击算续招")]
+        public float comboWindow = 0.85f;
+
         [Header("开关")]
         public bool inputEnabled = true;
+
+        /// <summary>当前连击段（0/1/2）。</summary>
+        public int ComboIndex { get; private set; }
+        public int LastComboStep { get; private set; }
+        public float LastDamageMul { get; private set; } = 1f;
 
         // ---------------- 诊断用只读状态 ----------------
         public bool Ready { get { return Time.time >= _nextSwing; } }
@@ -76,10 +93,13 @@ namespace MedusaHorror.Player
 
         TrailRenderer _trail;
         float _nextSwing;
+        float _lastSwingTime = -999f;
         float _swingElapsed = -1f;
         Quaternion _bladeBaseRot;
         Vector3 _bladeBasePos;
         bool _bladeCaptured;
+        Vector3 _curWind = WindDir;
+        Vector3 _curHit = HitDir;
 
         void Awake()
         {
@@ -198,10 +218,36 @@ namespace MedusaHorror.Player
             Swing();
         }
 
-        /// <summary>执行一次挥砍：扇形判定 + 命中/挥空反馈。</summary>
+        /// <summary>执行一次挥砍：扇形判定 + 命中/挥空反馈。连击开启时自动推进段数。</summary>
         public void Swing()
         {
-            _nextSwing = Time.time + Mathf.Max(0.05f, attackInterval);
+            // ---- 连击段推进 ----
+            int step = 0;
+            float interval = attackInterval;
+            float dmgMul = 1f;
+            float dur = swingDuration;
+
+            if (useCombo && comboDamageMul != null && comboDamageMul.Length >= 3)
+            {
+                bool chain = (Time.time - _lastSwingTime) <= comboWindow;
+                step = chain ? (ComboIndex + 1) % 3 : 0;
+                ComboIndex = step;
+                LastComboStep = step;
+                interval = comboInterval[Mathf.Clamp(step, 0, comboInterval.Length - 1)];
+                dmgMul = comboDamageMul[Mathf.Clamp(step, 0, comboDamageMul.Length - 1)];
+                dur = comboDuration[Mathf.Clamp(step, 0, comboDuration.Length - 1)];
+                _curWind = ComboWindDirs[step];
+                _curHit = ComboHitDirs[step];
+            }
+            else
+            {
+                _curWind = WindDir;
+                _curHit = HitDir;
+            }
+            LastDamageMul = dmgMul;
+
+            _nextSwing = Time.time + Mathf.Max(0.05f, interval);
+            _lastSwingTime = Time.time;
             SwingCount++;
             LastSwingTime = Time.time;
             _swingElapsed = 0f;
@@ -218,7 +264,7 @@ namespace MedusaHorror.Player
             {
                 LastSwingDamage = 0f;
                 LastSwingResult = "挥空";
-                if (swingBody != null) swingBody.BeginSwing(swingDuration, false);
+                if (swingBody != null) swingBody.BeginSwing(dur, false);
                 if (audio != null) audio.Play(SfxId.SlashSwing, 0.62f, Random.Range(0.94f, 1.06f));
                 if (hud != null) hud.ShowSwingResult("挥空", false);
                 return;
@@ -228,14 +274,14 @@ namespace MedusaHorror.Player
             int hitCount = 0;
             for (int i = 0; i < targets.Count; i++)
             {
-                var boss = targets[i];
-                if (boss == null || boss.IsDead) continue;
+                var target = targets[i];
+                if (target == null || target.IsDead) continue;
 
-                Vector3 point = boss.transform.position + Vector3.up * 1.0f;
+                Vector3 point = target.Transform.position + Vector3.up * 1.0f;
                 Vector3 hitPoint = Vector3.Lerp(pivot, point, 0.75f);
 
-                float dmg = damage * MedusaHorror.Core.PlayerStats.DamageMultiplier;
-                boss.TakeDamage(dmg);
+                float dmg = damage * dmgMul * MedusaHorror.Core.PlayerStats.DamageMultiplier;
+                target.TakeDamage(dmg);
                 dealt += dmg;
                 hitCount++;
                 TotalHits++;
@@ -244,19 +290,22 @@ namespace MedusaHorror.Player
             }
 
             LastSwingDamage = dealt;
-            LastSwingResult = hitCount > 0 ? ("命中 " + hitCount + " 个目标 · " + dealt.ToString("0") + " 伤害") : "挥空";
-            if (swingBody != null) swingBody.BeginSwing(swingDuration, hitCount > 0);
+            LastSwingResult = hitCount > 0
+                ? ("第 " + (step + 1) + " 段 · 命中 " + hitCount + " 个目标 · " + dealt.ToString("0") + " 伤害")
+                : "挥空";
+            if (swingBody != null) swingBody.BeginSwing(dur, hitCount > 0);
 
             if (audio != null)
             {
-                audio.Play(SfxId.SlashHit, 0.88f, Random.Range(0.95f, 1.08f));
+                audio.Play(SfxId.SlashHit, 0.88f, Random.Range(0.95f, 1.08f) * (step == 2 ? 0.9f : 1f));
                 if (hitCount == 0) audio.Play(SfxId.SlashSwing, 0.5f, 1f);
             }
 
             if (hitCount > 0)
             {
-                if (shake != null) shake.Shake(shakeDegrees, shakeSeconds);
-                if (hud != null) hud.FlashWhite(hitCount > 0 ? 0.22f : 0f);
+                float shakeMul = step == 2 ? 1.8f : 1f;
+                if (shake != null) shake.Shake(shakeDegrees * shakeMul, shakeSeconds);
+                if (hud != null) hud.FlashWhite(step == 2 ? 0.34f : 0.22f);
                 if (hud != null) hud.ShowSwingResult(LastSwingResult, true);
             }
             else
@@ -265,10 +314,10 @@ namespace MedusaHorror.Player
             }
         }
 
-        /// <summary>扇形范围内的所有 Boss（去重、按距离排序、受 maxTargets 限制）。</summary>
-        List<MedusaBoss> CollectTargets()
+        /// <summary>扇形范围内的所有可受击目标（去重、按距离排序、受 maxTargets 限制）。</summary>
+        List<IDamageable> CollectTargets()
         {
-            var result = new List<MedusaBoss>();
+            var result = new List<IDamageable>();
             Vector3 origin = transform.position;
             Vector3 fwd = transform.forward;
             fwd.y = 0f;
@@ -277,8 +326,8 @@ namespace MedusaHorror.Player
 
             var cols = Physics.OverlapSphere(origin + Vector3.up * 1.05f, attackRange + 0.8f,
                 ~0, QueryTriggerInteraction.Collide);
-            var seen = new HashSet<MedusaBoss>();
-            var scored = new List<KeyValuePair<float, MedusaBoss>>();
+            var seen = new HashSet<IDamageable>();
+            var scored = new List<KeyValuePair<float, IDamageable>>();
             string diag = "cols=" + cols.Length + " pos=" + origin.ToString("F2") + " fwd=" + fwd.ToString("F2")
                 + " r=" + (attackRange + 0.8f).ToString("F2");
 
@@ -286,27 +335,26 @@ namespace MedusaHorror.Player
             {
                 var c = cols[i];
                 if (c == null) continue;
-                // 玩家与 Boss 同处 playerLayer，不能按 layer 过滤，改为排除玩家自身层级
                 if (c.transform.root == transform.root) continue;
 
-                var boss = c.GetComponentInParent<MedusaBoss>();
-                if (boss == null || boss.IsDead) continue;
-                if (seen.Contains(boss)) continue;
+                var target = c.GetComponentInParent<IDamageable>();
+                if (target == null || target.IsDead) continue;
+                if (seen.Contains(target)) continue;
 
-                Vector3 to = boss.transform.position - origin;
+                Vector3 to = target.Transform.position - origin;
                 if (Mathf.Abs(to.y) > maxHeightDiff) continue;
                 to.y = 0f;
                 float dist = to.magnitude;
-                diag += " |" + boss.name + " d=" + dist.ToString("F2");
+                diag += " |" + target.Transform.name + " d=" + dist.ToString("F2");
                 if (dist > attackRange) { diag += ">R"; continue; }
-                if (dist < 0.05f) { seen.Add(boss); scored.Add(new KeyValuePair<float, MedusaBoss>(0f, boss)); continue; }
+                if (dist < 0.05f) { seen.Add(target); scored.Add(new KeyValuePair<float, IDamageable>(0f, target)); continue; }
 
                 float ang = Vector3.Angle(fwd, to);
                 diag += " a=" + ang.ToString("F1");
                 if (ang > attackAngle * 0.5f) { diag += ">A"; continue; }
 
-                seen.Add(boss);
-                scored.Add(new KeyValuePair<float, MedusaBoss>(dist, boss));
+                seen.Add(target);
+                scored.Add(new KeyValuePair<float, IDamageable>(dist, target));
             }
 
             scored.Sort((a, b) => a.Key.CompareTo(b.Key));
@@ -392,8 +440,8 @@ namespace MedusaHorror.Player
             Vector3 restW = bladeRoot.parent != null
                 ? bladeRoot.parent.rotation * (_bladeBaseRot * Vector3.forward)
                 : transform.TransformDirection(RestDir);
-            Vector3 windW = transform.TransformDirection(WindDir).normalized;
-            Vector3 hitW = transform.TransformDirection(HitDir).normalized;
+            Vector3 windW = transform.TransformDirection(_curWind).normalized;
+            Vector3 hitW = transform.TransformDirection(_curHit).normalized;
 
             Vector3 dir;
             if (u < 0.30f) dir = Vector3.Slerp(restW, windW, EaseInOut(u / 0.30f));
@@ -440,6 +488,20 @@ namespace MedusaHorror.Player
         static readonly Vector3 RestDir = new Vector3(0.16f, 0.96f, 0.22f).normalized;
         static readonly Vector3 WindDir = new Vector3(0.44f, 0.80f, -0.42f).normalized;
         static readonly Vector3 HitDir = new Vector3(-0.26f, -0.34f, 0.90f).normalized;
+
+        // 三段连击各自的起手/落点方向：斜劈 → 反手横扫 → 上举重斩
+        static readonly Vector3[] ComboWindDirs =
+        {
+            new Vector3(0.44f, 0.80f, -0.42f).normalized,
+            new Vector3(-0.62f, 0.55f, -0.34f).normalized,
+            new Vector3(0.10f, 1.00f, -0.08f).normalized,
+        };
+        static readonly Vector3[] ComboHitDirs =
+        {
+            new Vector3(-0.26f, -0.34f, 0.90f).normalized,
+            new Vector3(0.55f, -0.16f, 0.82f).normalized,
+            new Vector3(0.02f, -0.78f, 0.62f).normalized,
+        };
 
         /// <summary>让物体的本地 +Z 指向 dir，roll 由 upHint 决定。</summary>
         static Quaternion LookDir(Vector3 dir, Vector3 upHint)

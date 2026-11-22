@@ -46,6 +46,7 @@ namespace MedusaHorror.EditorTools
             int sqBuilds = BuildSquareBuildings(root, sb);
             int npcs = BuildNpcs(root, sb);
             int items = BuildQuestItems(root, sb);
+            int monsters = BuildMonsters(root, sb);
             BuildAtmosphere(root, sb);
             var player = BuildPlayer(root, sb);
             BuildCamera(player, sb);
@@ -68,7 +69,8 @@ namespace MedusaHorror.EditorTools
             EditorBuildSettings.scenes = list.ToArray();
 
             sb.AppendLine("[W2] 保存完成 road=" + roads + " walk=" + walks + " build=" + builds + " prop=" + props
-                          + " 广场房=" + sqBuilds + " NPC=" + npcs + " 任务物=" + items);
+                          + " 广场房=" + sqBuilds + " NPC=" + npcs + " 任务物=" + items
+                          + " 刷怪点=" + monsters);
             sb.AppendLine("[W2] BuildSettings=" + DescribeBuildSettings());
             return sb.ToString();
         }
@@ -421,6 +423,50 @@ namespace MedusaHorror.EditorTools
 
         // ------------------------------------------------------------------ 荒废村庄
         /// <summary>中央广场：石板地面 + 中央篝火 + 四角木桩。</summary>
+        // ------------------------------------------------------------------ 野外怪物 + 攻城
+
+        static int BuildMonsters(Transform root, StringBuilder sb)
+        {
+            var holder = new GameObject("W2_Monsters").transform;
+            holder.SetParent(root, false);
+
+            // x, z, kind(0 石行者 / 1 石像鬼 / 2 酸蚀爬虫)
+            float[,] spots =
+            {
+                { -11.5f, -40f, 0 },
+                {  11.5f,  22f, 0 },
+                { -12.5f,  54f, 1 },
+                {  10.5f, -18f, 2 },
+                {   0f,    62f, 0 },
+            };
+
+            int n = 0;
+            for (int i = 0; i < spots.GetLength(0); i++)
+            {
+                var go = new GameObject("MonsterSpot_" + i);
+                go.transform.SetParent(holder, false);
+                go.transform.position = new Vector3(spots[i, 0], 0f, spots[i, 1]);
+                var sp = go.AddComponent<MonsterSpawner>();
+                sp.kind = (Monster.Kind)Mathf.RoundToInt(spots[i, 2]);
+                sp.targetCount = sp.kind == Monster.Kind.Brute ? 1 : 2;
+                sp.spawnRadius = 6f;
+                sp.activeRadius = 26f;
+                n++;
+            }
+
+            // 攻城导演：玩家走进广场就开打
+            var siege = new GameObject("W2_SiegeDirector");
+            siege.transform.SetParent(holder, false);
+            siege.transform.position = new Vector3(0f, 0f, 0f);
+            var sd = siege.AddComponent<SiegeDirector>();
+            sd.startRadius = 13f;
+            sd.spawnRadius = 26f;
+            sd.waveGap = 8f;
+
+            sb.AppendLine("[W2] 怪物：刷怪点=" + n + " 攻城波次=" + (sd.waveStalkers == null ? 0 : sd.waveStalkers.Length));
+            return n;
+        }
+
         static void BuildVillageSquare(Transform root, StringBuilder sb)
         {
             var stoneMat = LoadMat("Assets/ApocalypticWasteland/UrbanAssets/Materials/BetonBase_ALBEDO.mat");

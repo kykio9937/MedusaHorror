@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using MedusaHorror.Gameplay;
 
 namespace MedusaHorror.EditorTools
 {
@@ -41,6 +42,7 @@ namespace MedusaHorror.EditorTools
             BuildLighting(root, sb);
             // 出生点避开南端隧道口铁轨（铁轨顶面 0.64m，站上去会把人托起来）
             BuildEncounters(root, sb);
+            BuildTrainDoor(root, mats, sb);
             var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 10f), 0f, sb, "W3");
             LevelKit.BuildCamera(player, "CM_W3_ThirdPerson", sb, "W3");
             // 地铁出口：需要先点亮，且要买票（200 信用点）才能乘车去霓虹街区
@@ -52,6 +54,41 @@ namespace MedusaHorror.EditorTools
             sb.AppendLine("[W3] 地砖=" + floor + " 墙段=" + walls);
             LevelKit.SaveAndRegister(scene, ScenePath, "W2_Wasteland.unity", sb, "W3");
             return sb.ToString();
+        }
+
+        // ------------------------------------------------------------------ 列车车门
+
+        static void BuildTrainDoor(Transform root, Mats m, StringBuilder sb)
+        {
+            var doorRoot = new GameObject("W3_TrainDoor");
+            doorRoot.transform.SetParent(root, false);
+            Vector3 at = new Vector3(HALF_W - 1.1f, 0f, 6f);
+            doorRoot.transform.position = at;
+
+            // 门框（发光）
+            var frameMat = new Material(Shader.Find("Standard"));
+            frameMat.color = new Color(0.15f, 0.55f, 0.62f);
+            frameMat.EnableKeyword("_EMISSION");
+            frameMat.SetColor("_EmissionColor", new Color(0.15f, 0.7f, 0.8f) * 2.2f);
+
+            LevelKit.Slab("TrainDoorLeft", doorRoot.transform, new Vector3(-0.85f, 1.3f, 0f),
+                new Vector3(0.12f, 2.6f, 0.2f), frameMat);
+            LevelKit.Slab("TrainDoorRight", doorRoot.transform, new Vector3(0.85f, 1.3f, 0f),
+                new Vector3(0.12f, 2.6f, 0.2f), frameMat);
+            LevelKit.Slab("TrainDoorTop", doorRoot.transform, new Vector3(0f, 2.62f, 0f),
+                new Vector3(1.82f, 0.12f, 0.2f), frameMat);
+            LevelKit.Slab("TrainDoorGlow", doorRoot.transform, new Vector3(0f, 1.3f, 0.08f),
+                new Vector3(1.6f, 2.5f, 0.04f), frameMat, false);
+
+            var col = doorRoot.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.center = new Vector3(0f, 1.3f, 0f);
+            col.size = new Vector3(1.8f, 2.6f, 0.9f);
+
+            var bp = doorRoot.AddComponent<TrainBoardPoint>();
+            bp.stationReturn = new Vector3(HALF_W - 1.9f, 0.3f, 6f);
+
+            sb.AppendLine("[W3] 列车车门已放置");
         }
 
         class Mats
