@@ -2063,6 +2063,13 @@ public static class W1Pump
             return sbD.ToString();
         }
         if (op == "PSET") { var tp1 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(); if (tp1 == null) return "PSET=NULL"; var cc1 = tp1.GetComponent<CharacterController>(); float px = float.Parse(parts[1], CultureInfo.InvariantCulture), py = float.Parse(parts[2], CultureInfo.InvariantCulture), pz = float.Parse(parts[3], CultureInfo.InvariantCulture); if (cc1 != null) cc1.enabled = false; tp1.transform.position = new Vector3(px, py, pz); if (cc1 != null) cc1.enabled = true; return "PSET=" + tp1.transform.position.ToString("F2"); }
+        if (op == "SETLAST")
+        {
+            if (parts.Length < 2) return "SETLAST=" + MedusaHorror.Core.SaveSystem.Data.lastScene;
+            MedusaHorror.Core.SaveSystem.Data.lastScene = parts[1];
+            MedusaHorror.Core.SaveSystem.Save();
+            return "SETLAST=" + parts[1];
+        }
         if (op == "COINS")
         {
             if (parts.Length < 2) return "COINS=" + MedusaHorror.Core.Wallet.Coins;

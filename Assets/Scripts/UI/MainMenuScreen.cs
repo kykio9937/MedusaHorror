@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
@@ -72,15 +72,24 @@ namespace MedusaHorror.UI
                 new Vector2(0f, 118f), new Vector2(1200f, 44f));
             _sub.color = new Color(0.72f, 0.66f, 0.62f, 0.95f);
 
-            var start = NewButton("BtnStart", canvasGo.transform, font, "开始游戏",
-                new Vector2(0f, -30f), new Color(0.36f, 0.16f, 0.15f, 0.98f), StartGame);
+            string resumeScene = ResolveResumeScene();
+            bool canResume = !string.IsNullOrEmpty(resumeScene);
+
+            var resume = NewButton("BtnResume", canvasGo.transform, font,
+                canResume ? ("继续游戏 · " + MedusaHorror.Core.SceneLoader.DisplayName(resumeScene)) : "继续游戏（暂无存档）",
+                new Vector2(0f, 34f), new Color(0.20f, 0.28f, 0.34f, 0.98f), ContinueGame);
+            resume.interactable = canResume;
+
+            var start = NewButton("BtnStart", canvasGo.transform, font, "开始游戏（新进度）",
+                new Vector2(0f, -56f), new Color(0.36f, 0.16f, 0.15f, 0.98f), StartGame);
 
             var quit = NewButton("BtnQuit", canvasGo.transform, font, "退出游戏",
-                new Vector2(0f, -122f), new Color(0.16f, 0.16f, 0.18f, 0.98f), QuitGame);
+                new Vector2(0f, -146f), new Color(0.16f, 0.16f, 0.18f, 0.98f), QuitGame);
 
             _hint = NewText("Hint", canvasGo.transform, font, 22,
-                "回车 / 空格 开始　·　ESC 退出",
-                new Vector2(0f, -232f), new Vector2(900f, 40f));
+                canResume ? "回车 / 空格 新进度　·　C 继续上次进度　·　ESC 退出"
+                          : "回车 / 空格 开始　·　ESC 退出",
+                new Vector2(0f, -240f), new Vector2(1000f, 40f));
             _hint.color = new Color(0.70f, 0.66f, 0.62f, 0.8f);
 
             var foot = NewText("Foot", canvasGo.transform, font, 20,
@@ -106,6 +115,7 @@ namespace MedusaHorror.UI
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame) StartGame();
+            else if (kb.cKey.wasPressedThisFrame) ContinueGame();
             else if (kb.escapeKey.wasPressedThisFrame) QuitGame();
 #endif
         }
@@ -119,6 +129,29 @@ namespace MedusaHorror.UI
             if (Application.CanStreamedLevelBeLoaded(gameScene))
                 MedusaHorror.Core.SceneLoader.Load(gameScene, "W1 · 废弃医院　消毒水与铁锈的气味");
             else Debug.LogError("[MainMenu] Build Settings 中找不到场景 " + gameScene);
+        }
+
+        /// <summary>继续上次进度：读存档里记录的落点场景。</summary>
+        public void ContinueGame()
+        {
+            string scene = ResolveResumeScene();
+            if (string.IsNullOrEmpty(scene)) return;
+            Time.timeScale = 1f;
+            var audio = MedusaHorror.Core.AudioDirector.Instance;
+            if (audio != null) audio.PlayUi();
+            Debug.Log("[MainMenu] 继续游戏 -> " + scene);
+            MedusaHorror.Core.SceneLoader.Load(scene, null);
+        }
+
+        /// <summary>可继续的落点：非空、不是菜单本身、Build Settings 里能加载。</summary>
+        static string ResolveResumeScene()
+        {
+            var s = MedusaHorror.Core.SaveSystem.Data.lastScene;
+            if (string.IsNullOrEmpty(s)) return null;
+            if (s == SceneManager.GetActiveScene().name) return null;
+            if (s == MedusaHorror.Core.GameFlow.MenuScene) return null;
+            if (!Application.CanStreamedLevelBeLoaded(s)) return null;
+            return s;
         }
 
         public void QuitGame()
@@ -153,6 +186,19 @@ namespace MedusaHorror.UI
             colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 0.95f);
             btn.colors = colors;
             btn.onClick.AddListener(onClick);
+
+            // 按钮文字（之前漏了，按钮一直是空框）
+            var labelRt = NewRect(name + "Label", rt);
+            Stretch(labelRt);
+            var txt = labelRt.gameObject.AddComponent<Text>();
+            txt.font = font;
+            txt.fontSize = 30;
+            txt.text = label;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.color = new Color(0.96f, 0.94f, 0.90f, 1f);
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.raycastTarget = false;
+
             return btn;
         }
 

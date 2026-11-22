@@ -72,6 +72,11 @@ namespace MedusaHorror.Core
                 }
             }
 
+            // 记录进度落点：回主菜单时清空，避免"继续游戏"把玩家丢回菜单
+            if (target == GameFlow.MenuScene) SaveSystem.Data.lastScene = "";
+            else SaveSystem.Data.lastScene = target;
+            SaveSystem.Save();
+
             Instance.StartCoroutine(Instance.LoadRoutine(target, tip));
         }
 
