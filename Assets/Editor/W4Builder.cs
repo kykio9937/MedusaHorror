@@ -19,6 +19,7 @@ namespace MedusaHorror.EditorTools
         const string PROPS = "Assets/Dark City 2/Assets/Prefabs/Street Props/";
         const string LIGHTS = "Assets/Dark City 2/Assets/Prefabs/Street Lights/";
         const string BG = "Assets/Dark City 2/Assets/Prefabs/Background/";
+        const string BILL = "Assets/Dark City 2/Assets/Prefabs/Billboards/";
         const string VEH = "Assets/Dark City 2/Assets/Prefabs/Vehicles/";
         const string NEON = "Assets/Dark City 2/Assets/Source/Materials/Neons/";
         const string MAT = "Assets/Dark City 2/Assets/Source/Materials/";
@@ -38,17 +39,20 @@ namespace MedusaHorror.EditorTools
             var sb = new StringBuilder("[W4] 赛博街区\n");
 
             int roads = BuildRoad(root, sb);
+            BuildCrossStreets(root, sb);
             int walks = BuildSideWalks(root, sb);
             int builds = BuildBuildings(root, sb);
             BuildSkyline(root, sb);
             BuildNeon(root, sb);
+            BuildBillboards(root, sb);
+            BuildPlayerHouse(root, sb);
             int props = BuildProps(root, sb);
             BuildAtmosphere(root, sb);
             var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 8f), 0f, sb, "W4");
             LevelKit.BuildCamera(player, "CM_W4_ThirdPerson", sb, "W4");
             LevelKit.BuildExitPortal(root, "W4_ExitPortal", new Vector3(0f, 0f, Z1 - 7f), 180f,
                 new Color(0.95f, 0.30f, 0.85f, 0.45f), new Color(1f, 0.35f, 0.95f),
-                LevelKit.LoadMat(MAT + "Metallic/Metal_01.mat"), "", sb, "W4");
+                LevelKit.LoadMat(MAT + "Metallic/Metal_01.mat"), "", sb, "W4", true);
             LevelKit.BuildIntro(root, "霓虹在雨里发亮。街尾那道光，是下一段路。", 1.6f);
 
             sb.AppendLine("[W4] 路面=" + roads + " 人行道=" + walks + " 建筑=" + builds + " 杂物=" + props);
@@ -65,7 +69,8 @@ namespace MedusaHorror.EditorTools
             mat = LevelKit.MakeTinted("W4_Road", mat, new Color(0.20f, 0.20f, 0.22f));
 
             // 碰撞地面：整片街区隐形托底板（包内路面无碰撞体），不渲染，让原包路面贴图完整露出
-            LevelKit.InvisibleSlab("GroundCollider", root, new Vector3(0f, -0.35f, 0f),
+            // 顶面必须与路面贴图齐平（y=0），否则角色会站进路面里、下半身看不见
+            LevelKit.InvisibleSlab("GroundCollider", root, new Vector3(0f, -0.15f, 0f),
                 new Vector3(150f, 0.3f, 150f));
 
             int n = 0;
@@ -88,14 +93,19 @@ namespace MedusaHorror.EditorTools
                     new Vector3(0f, 7f, s * 62f), new Vector3(46f, 14f, 1.5f));
             }
 
-            // 两侧隐形挡墙：把人行道和建筑隔开，避免走进建筑缝隙被 collider 挤到屋顶
+            // 两侧隐形挡墙：分三段，在 z≈±26 处留出横街开口，形成可绕行的支路
+            float[][] segs = { new[] { -66f, -31f }, new[] { -21f, 21f }, new[] { 31f, 66f } };
             for (int side = -1; side <= 1; side += 2)
             {
-                var bound = new GameObject("SideBound" + (side < 0 ? "L" : "R"));
-                bound.transform.SetParent(root, false);
-                bound.transform.position = new Vector3(side * 10.9f, 3f, 0f);
-                var bc = bound.AddComponent<BoxCollider>();
-                bc.size = new Vector3(1.6f, 10f, 132f);
+                for (int si = 0; si < segs.Length; si++)
+                {
+                    float a = segs[si][0], b = segs[si][1];
+                    var bound = new GameObject("SideBound" + (side < 0 ? "L" : "R") + si);
+                    bound.transform.SetParent(root, false);
+                    bound.transform.position = new Vector3(side * 10.9f, 3f, (a + b) * 0.5f);
+                    var bc = bound.AddComponent<BoxCollider>();
+                    bc.size = new Vector3(1.6f, 10f, b - a);
+                }
             }
             return n;
         }
@@ -120,6 +130,35 @@ namespace MedusaHorror.EditorTools
             return n;
         }
 
+        // ------------------------------------------------------------------ 横街
+        static int BuildCrossStreets(Transform root, StringBuilder sb)
+        {
+            var mat = LevelKit.LoadFirstMaterial(MAT + "Rough", "asphalt");
+            if (mat == null) mat = LevelKit.LoadFirstMaterial(MAT + "Rough", null);
+            mat = LevelKit.MakeTinted("W4_Cross", mat, new Color(0.20f, 0.20f, 0.22f));
+
+            int n = 0;
+            float[] zs = { -26f, 26f };
+            for (int i = 0; i < zs.Length; i++)
+            {
+                float z = zs[i];
+                LevelKit.Slab("CrossRoad" + i, root, new Vector3(0f, 0.02f, z),
+                    new Vector3(56f, 0.04f, 10f), mat);
+                // 横街两侧路缘
+                LevelKit.Slab("CrossCurbA" + i, root, new Vector3(0f, 0.12f, z - 5.4f),
+                    new Vector3(56f, 0.24f, 1.0f), mat, false);
+                LevelKit.Slab("CrossCurbB" + i, root, new Vector3(0f, 0.12f, z + 5.4f),
+                    new Vector3(56f, 0.24f, 1.0f), mat, false);
+                // 尽头封板，避免走到建筑缝隙里
+                for (int s = -1; s <= 1; s += 2)
+                    LevelKit.InvisibleSlab("CrossCap" + i + (s < 0 ? "L" : "R"), root,
+                        new Vector3(s * 28f, 5f, z), new Vector3(1.5f, 10f, 10f));
+                n++;
+            }
+            sb.AppendLine("[W4] 横街=" + n);
+            return n;
+        }
+
         // ------------------------------------------------------------------ 建筑
         static int BuildBuildings(Transform root, StringBuilder sb)
         {
@@ -133,6 +172,8 @@ namespace MedusaHorror.EditorTools
             int i = 0;
             for (float z = Z0 + 10f; z < Z1 + 6f; z += 18f)
             {
+                // 横街开口处不放建筑，留出可通行空间
+                if (Mathf.Abs(z + 24f) < 0.1f || Mathf.Abs(z - 30f) < 0.1f) { i++; continue; }
                 for (int side = -1; side <= 1; side += 2)
                 {
                     string path = BUILD + facades[(i * 2 + (side > 0 ? 1 : 0)) % facades.Length];
@@ -235,6 +276,132 @@ namespace MedusaHorror.EditorTools
                 }
             }
             sb.AppendLine("[W4] 霓虹招牌=" + n);
+        }
+
+        /// <summary>真实霓虹广告牌：逐个挂在临街建筑的正立面上，避免悬空。</summary>
+        static void BuildBillboards(Transform root, StringBuilder sb)
+        {
+            string[] boards =
+            {
+                "Billboard_01.prefab", "Billboard_02.prefab", "Billboard_03.prefab",
+                "Billboard_04.prefab", "Billboard_05.prefab", "Billboard_06.prefab",
+                "Billboard_07a.prefab", "Banner_Moving_01.prefab",
+                "Banner_Moving_02.prefab", "Banner_Moving_03.prefab"
+            };
+            var rnd = new System.Random(9911);
+            int n = 0;
+            var all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                var t = all[i];
+                if (!t.name.StartsWith("Building_")) continue;
+                var rs = t.GetComponentsInChildren<Renderer>();
+                if (rs.Length == 0) continue;
+                Bounds b = rs[0].bounds;
+                for (int k = 1; k < rs.Length; k++) b.Encapsulate(rs[k].bounds);
+
+                int side = t.position.x < 0f ? -1 : 1;
+                // 建筑朝街面固定在 ±(ROAD_HALF+2.6)，招牌贴着这个面往外 6cm
+                float faceX = side * (ROAD_HALF + 2.6f + 0.06f);
+                int count = 1 + rnd.Next(0, 2);
+                for (int k = 0; k < count; k++)
+                {
+                    string path = BILL + boards[rnd.Next(0, boards.Length)];
+                    float z = Mathf.Lerp(b.min.z + 2.5f, b.max.z - 2.5f, (float)rnd.NextDouble());
+                    float h = Mathf.Lerp(5f, Mathf.Max(6f, b.max.y - 4f), (float)rnd.NextDouble());
+                    var go = LevelKit.Place(path, new Vector3(faceX, h, z), side < 0 ? 90f : -90f, root, false);
+                    if (go == null) continue;
+                    float sc = 0.9f + (float)rnd.NextDouble() * 0.5f;
+                    go.transform.localScale = new Vector3(sc, sc, sc);
+                    n++;
+                }
+            }
+            sb.AppendLine("[W4] 广告牌=" + n);
+        }
+
+        /// <summary>玩家可购置的公寓：墙体+门+室内家具，门牌可交互购买（800 信用点）。</summary>
+        static void BuildPlayerHouse(Transform root, StringBuilder sb)
+        {
+            const float hx = -12.5f, hz = 3f;
+            const float w = 5.5f, d = 7f, h = 3.2f;
+
+            var house = new GameObject("PlayerHouse");
+            house.transform.SetParent(root, false);
+            house.transform.position = new Vector3(hx, 0f, hz);
+
+            var wallMat = LevelKit.LoadMat(MAT + "Metallic/Metal_01.mat");
+            if (wallMat == null) wallMat = LevelKit.LoadMat(MAT + "Concrete/Concrete_01.mat");
+            var floorMat = LevelKit.LoadMat(MAT + "Metallic/Metal_02.mat");
+            if (floorMat == null) floorMat = wallMat;
+
+            // 地板 / 天花板
+            LevelKit.Slab("HouseFloor", house.transform, new Vector3(hx, 0.05f, hz),
+                new Vector3(w, 0.1f, d), floorMat);
+            LevelKit.Slab("HouseCeiling", house.transform, new Vector3(hx, h, hz),
+                new Vector3(w, 0.12f, d), wallMat);
+
+            // 西 / 北 / 南 三面墙
+            LevelKit.Slab("HouseWallW", house.transform, new Vector3(hx - w * 0.5f, h * 0.5f, hz),
+                new Vector3(0.2f, h, d), wallMat);
+            LevelKit.Slab("HouseWallN", house.transform, new Vector3(hx, h * 0.5f, hz + d * 0.5f),
+                new Vector3(w, h, 0.2f), wallMat);
+            LevelKit.Slab("HouseWallS", house.transform, new Vector3(hx, h * 0.5f, hz - d * 0.5f),
+                new Vector3(w, h, 0.2f), wallMat);
+
+            // 东墙（朝街）：中间留 2m 门洞
+            LevelKit.Slab("HouseWallE1", house.transform, new Vector3(hx + w * 0.5f, h * 0.5f, hz + 2.2f),
+                new Vector3(0.2f, h, 2.4f), wallMat);
+            LevelKit.Slab("HouseWallE2", house.transform, new Vector3(hx + w * 0.5f, h * 0.5f, hz - 2.2f),
+                new Vector3(0.2f, h, 2.4f), wallMat);
+            LevelKit.Slab("HouseLintel", house.transform, new Vector3(hx + w * 0.5f, 2.85f, hz),
+                new Vector3(0.2f, 0.7f, 2.2f), wallMat);
+
+            // 门扇（锁着，购置后解锁）
+            var doorGo = LevelKit.Slab("HouseDoor", house.transform,
+                new Vector3(hx + w * 0.5f, 1.15f, hz), new Vector3(0.14f, 2.3f, 2.0f), wallMat);
+            var door = doorGo.AddComponent<MedusaHorror.Gameplay.DoorInteractable>();
+            door.closedHint = "开门";
+            door.openedHint = "关门";
+            door.lockedHint = "门锁着 · 先去门牌购置";
+            door.openAngle = 88f;
+            door.Lock();
+
+            // 门牌：可交互购买
+            var plaque = LevelKit.Slab("HousePlaque", house.transform,
+                new Vector3(hx + w * 0.5f + 0.14f, 1.75f, hz + 1.55f), new Vector3(0.08f, 0.55f, 0.85f), wallMat);
+            var pr = plaque.GetComponent<MeshRenderer>();
+            if (pr != null)
+            {
+                var pm = new Material(Shader.Find("Standard"));
+                pm.color = new Color(1f, 0.72f, 0.25f);
+                pm.EnableKeyword("_EMISSION");
+                pm.SetColor("_EmissionColor", new Color(1f, 0.6f, 0.15f) * 2.4f);
+                pr.sharedMaterial = pm;
+            }
+            var hp = plaque.AddComponent<MedusaHorror.Gameplay.HousePurchase>();
+            hp.houseName = "霓虹公寓 7B";
+            hp.houseId = "W4_Apartment_7B";
+            hp.price = 800;
+            hp.door = door;
+
+            // 室内陈设
+            LevelKit.Slab("HouseBed", house.transform, new Vector3(hx - 1.6f, 0.35f, hz - 2.0f),
+                new Vector3(1.8f, 0.5f, 2.2f), wallMat);
+            LevelKit.Slab("HouseBedPillow", house.transform, new Vector3(hx - 1.6f, 0.68f, hz - 2.85f),
+                new Vector3(1.5f, 0.16f, 0.5f), floorMat);
+            LevelKit.Slab("HouseDesk", house.transform, new Vector3(hx + 0.9f, 0.4f, hz + 2.3f),
+                new Vector3(1.3f, 0.75f, 1.3f), wallMat);
+            LevelKit.Slab("HouseStool", house.transform, new Vector3(hx + 0.9f, 0.25f, hz + 1.4f),
+                new Vector3(0.6f, 0.45f, 0.6f), wallMat);
+
+            LevelKit.AddPointLight(house.transform, "HouseLamp",
+                new Vector3(hx, 2.7f, hz), new Color(1f, 0.78f, 0.5f), 1.9f, 8f);
+
+            // 门牌上方的小灯，提示这是可买的房子
+            LevelKit.AddPointLight(house.transform, "PlaqueLight",
+                new Vector3(hx + w * 0.5f + 0.5f, 2.2f, hz + 1.55f), new Color(1f, 0.65f, 0.2f), 1.4f, 5f);
+
+            sb.AppendLine("[W4] 可购公寓 pos=(" + hx + "," + hz + ") 价格=800");
         }
 
         // ------------------------------------------------------------------ 杂物
