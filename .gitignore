@@ -55,3 +55,4 @@ Assets/_TerrainAutoUpgrade/
 # 根目录临时截图与调试产物
 /*.png
 /probe_out.txt
+unity_restart.log
