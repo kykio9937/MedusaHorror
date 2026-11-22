@@ -81,10 +81,12 @@ namespace MedusaHorror.Gameplay
             get
             {
                 if (requireActivation && !Activated) return "点亮传送门";
-                if (cost > 0)
+                int fare = MedusaHorror.Core.Pricing.Apply(cost);
+                if (fare > 0)
                 {
-                    if (!Wallet.CanAfford(cost)) return "票价 " + cost + " · 余额不足（" + Wallet.Coins + "）";
-                    return "传送门已点亮 · 票价 " + cost;
+                    string tag = MedusaHorror.Core.Pricing.Tag(cost);
+                    if (!Wallet.CanAfford(fare)) return "票价 " + fare + tag + " · 余额不足（" + Wallet.Coins + "）";
+                    return "传送门已点亮 · 票价 " + fare + tag;
                 }
                 return "传送门已点亮";
             }
@@ -159,12 +161,13 @@ namespace MedusaHorror.Gameplay
             if (door != null && !door.IsOpen) return;
             if (!PlayerInside()) return;
 
-            if (cost > 0 && !Wallet.CanAfford(cost))
+            int fare = MedusaHorror.Core.Pricing.Apply(cost);
+            if (fare > 0 && !Wallet.CanAfford(fare))
             {
                 if (Time.unscaledTime - _warnAt > 2.5f)
                 {
                     _warnAt = Time.unscaledTime;
-                    LootToast.Show("票价 " + cost + " 信用点 · 当前只有 " + Wallet.Coins);
+                    LootToast.Show("票价 " + fare + " 信用点 · 当前只有 " + Wallet.Coins);
                     var a = AudioDirector.Instance;
                     if (a != null) a.PlayAt(SfxId.DoorLocked, transform.position, 0.7f, 1f);
                 }
@@ -221,10 +224,11 @@ namespace MedusaHorror.Gameplay
             string next = ResolveNextScene();
             string label = string.IsNullOrEmpty(next) ? MedusaHorror.Core.GameFlow.MenuScene : next;
 
-            if (cost > 0)
+            int fare = MedusaHorror.Core.Pricing.Apply(cost);
+            if (fare > 0)
             {
-                if (!Wallet.Spend(cost)) { _leaving = false; return; }
-                LootToast.Show("购票 -" + cost + " 信用点 · 前往 " + label);
+                if (!Wallet.Spend(fare)) { _leaving = false; return; }
+                LootToast.Show("购票 -" + fare + " 信用点 · 前往 " + label);
             }
             else
             {

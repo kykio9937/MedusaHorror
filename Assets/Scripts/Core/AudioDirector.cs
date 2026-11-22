@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Audio;
 
@@ -22,7 +22,8 @@ namespace MedusaHorror.Core
         UiClick,
         SlashSwing,
         SlashHit,
-        WeaponSwitch
+        WeaponSwitch,
+        Heartbeat
     }
 
     /// <summary>音频总线。</summary>
@@ -52,7 +53,9 @@ namespace MedusaHorror.Core
         readonly Dictionary<SfxId, AudioClip> _clips = new Dictionary<SfxId, AudioClip>();
         AudioSource[] _pool;
         int _poolCursor;
-        AudioSource _bgmA, _bgmB, _petrifySource, _ambienceBusRef;
+        AudioSource _bgmA, _bgmB, _petrifySource, _heartbeatSource, _ambienceBusRef;
+        AudioClip _defaultCalmClip, _villageClip, _neonClip, _gateClip;
+        string _sceneMusicKey = "";
         bool _bgmAIsCalm = true;
         [Tooltip("BGM 交叉淡入淡出时长（秒）：淡出完成后旧轨立即停播，实现真正互斥")]
         public float musicFadeSeconds = 1.2f;
@@ -180,6 +183,14 @@ namespace MedusaHorror.Core
             _petrifySource.spatialBlend = 0f;
             if (_sfxGroup != null) _petrifySource.outputAudioMixerGroup = _sfxGroup;
 
+            var hbGo = new GameObject("heartbeat_loop");
+            hbGo.transform.SetParent(transform, false);
+            _heartbeatSource = hbGo.AddComponent<AudioSource>();
+            _heartbeatSource.playOnAwake = false;
+            _heartbeatSource.loop = true;
+            _heartbeatSource.spatialBlend = 0f;
+            if (_sfxGroup != null) _heartbeatSource.outputAudioMixerGroup = _sfxGroup;
+
             _ambienceBusRef = null;
         }
 
@@ -247,6 +258,33 @@ namespace MedusaHorror.Core
             if (_petrifySource != null && _petrifySource.isPlaying) _petrifySource.Stop();
         }
 
+        // ─────────────────────────── 心跳（低血量 / 高石化） ───────────────────────────
+
+        float _heartbeatIntensity;
+
+        /// <summary>n=0 停止心跳；n 越大心跳越快越响，用于低血量与高石化危险提示。</summary>
+        public void SetHeartbeatIntensity(float normalized)
+        {
+            _heartbeatIntensity = Mathf.Clamp01(normalized);
+            if (_heartbeatSource == null) return;
+            AudioClip clip;
+            if (!_clips.TryGetValue(SfxId.Heartbeat, out clip) || clip == null) return;
+
+            if (_heartbeatIntensity <= 0.001f)
+            {
+                if (_heartbeatSource.isPlaying) _heartbeatSource.Stop();
+                return;
+            }
+
+            if (_heartbeatSource.clip != clip) _heartbeatSource.clip = clip;
+            if (!_heartbeatSource.isPlaying) _heartbeatSource.Play();
+            _heartbeatSource.pitch = 0.90f + 0.55f * _heartbeatIntensity;
+            _heartbeatSource.volume = (0.14f + 0.46f * _heartbeatIntensity) * _master * _sfxVol;
+        }
+
+        public bool HeartbeatPlaying { get { return _heartbeatSource != null && _heartbeatSource.isPlaying; } }
+        public float HeartbeatIntensity { get { return _heartbeatIntensity; } }
+
         // ─────────────────────────── BGM ───────────────────────────
 
         /// <summary>只保证 calm 轨在播，战斗轨关停（双轨互斥的默认态）。</summary>
@@ -288,6 +326,37 @@ namespace MedusaHorror.Core
             _bgmB.time = 0f;
             _bgmB.Play();
         }
+
+        /// <summary>按场景切换 calm 氛围乐：村庄 / 霓虹街 / 星门各有独立曲目，其余用默认曲。</summary>
+        public void ApplySceneMusic(string sceneName)
+        {
+            AudioClip target;
+            string key;
+            if (sceneName == "W2_Wasteland") { target = _villageClip; key = "village"; }
+            else if (sceneName == "W4_NeonStreet") { target = _neonClip; key = "neon"; }
+            else if (sceneName == "W5_AlienGate") { target = _gateClip; key = "gate"; }
+            else { target = _defaultCalmClip; key = "default"; }
+
+            if (target == null) { StartMusic(); return; }
+            if (_sceneMusicKey == key) return;   // 同一首不重播
+            _sceneMusicKey = key;
+            _calmClip = target;
+
+            if (_bgmA != null)
+            {
+                _bgmA.Stop();
+                _bgmA.clip = target;
+                _bgmA.time = 0f;
+            }
+            _bgmAIsCalm = true;
+            _bgmCurrentCalm = true;
+            _bgmVol = 0f;
+            if (_bgmB != null && _bgmB.isPlaying) _bgmB.Stop();
+            EnsureCalmSource();
+            ApplyMusicVolumes();
+        }
+
+        public string SceneMusicKey { get { return _sceneMusicKey; } }
 
         /// <summary>
         /// 真正互斥的 BGM 切换：此处只登记目标轨，实际切换由 Update 分三段完成
@@ -488,7 +557,12 @@ namespace MedusaHorror.Core
             _clips[SfxId.SlashSwing] = Synth.SlashSwing();
             _clips[SfxId.SlashHit] = Synth.SlashHit();
             _clips[SfxId.WeaponSwitch] = Synth.WeaponSwitch();
+            _clips[SfxId.Heartbeat] = Synth.Heartbeat();
             _calmClip = Synth.MusicCalm();
+            _defaultCalmClip = _calmClip;
+            _villageClip = Synth.MusicVillage();
+            _neonClip = Synth.MusicNeon();
+            _gateClip = Synth.MusicGate();
             _battleClip = Synth.MusicBattle();
         }
 
@@ -810,6 +884,30 @@ namespace MedusaHorror.Core
             }
 
             /// <summary>收刀 / 拔刀：两声短促机械咔哒。</summary>
+            static float Thump(float t, float at)
+            {
+                float dt = t - at;
+                if (dt < 0f) return 0f;
+                return Mathf.Exp(-dt * 16f) * Mathf.Clamp01(dt * 180f);
+            }
+
+            /// <summary>1 秒双拍心跳，可循环。</summary>
+            public static AudioClip Heartbeat()
+            {
+                var d = Buffer(1.0f);
+                for (int i = 0; i < d.Length; i++)
+                {
+                    float t = i / (float)R;
+                    float env = Thump(t, 0.06f) + Thump(t, 0.30f) * 0.68f;
+                    float body = Mathf.Sin(2f * Mathf.PI * 52f * t) * 0.82f
+                               + Mathf.Sin(2f * Mathf.PI * 78f * t) * 0.22f
+                               + Mathf.Sin(2f * Mathf.PI * 104f * t) * 0.08f;
+                    d[i] = body * env;
+                }
+                Normalize(d, 0.85f);
+                return Make("sfx_heartbeat", d);
+            }
+
             public static AudioClip WeaponSwitch()
             {
                 var d = Buffer(0.20f);
@@ -825,6 +923,90 @@ namespace MedusaHorror.Core
                 }
                 Normalize(d, 0.46f);
                 return Make("sfx_weapon_switch", d);
+            }
+
+            public static AudioClip MusicVillage()
+            {
+                float seconds = 16f;
+                var d = Buffer(seconds);
+                // 五声音阶：C3 D3 E3 G3 A3 C4 D4 E4
+                float[] notes = { 130.81f, 146.83f, 164.81f, 196.00f, 220.00f, 261.63f, 293.66f, 329.63f };
+                int[] pattern = { 0, 2, 4, 3, 5, 4, 2, 1, 0, 2, 3, 5, 6, 5, 3, 2,
+                                  1, 3, 5, 4, 6, 5, 3, 1, 0, 2, 4, 6, 7, 5, 4, 2 };
+                for (int i = 0; i < d.Length; i++)
+                {
+                    float t = i / (float)R;
+                    // 温暖 drone（取 16s 整数周期避免循环咔哒）
+                    float drone = Mathf.Sin(2f * Mathf.PI * 65.4375f * t) * 0.16f
+                                + Mathf.Sin(2f * Mathf.PI * 98f * t) * 0.09f;
+                    // 0.5s 一拍的拨弦
+                    int step = (int)(t / 0.5f);
+                    float local = t - step * 0.5f;
+                    float f = notes[pattern[step % pattern.Length]];
+                    float pluck = (Mathf.Sin(2f * Mathf.PI * f * local) * 0.70f
+                                 + Mathf.Sin(2f * Mathf.PI * f * 2f * local) * 0.24f
+                                 + Mathf.Sin(2f * Mathf.PI * f * 3f * local) * 0.09f)
+                                 * Mathf.Exp(-local * 6.2f);
+                    d[i] = drone + pluck * 0.34f;
+                }
+                Normalize(d, 0.50f);
+                return Make("bgm_village", d);
+            }
+
+            public static AudioClip MusicNeon()
+            {
+                float beat = 60f / 110f;
+                float seconds = beat * 16f;   // 正好 16 拍，循环无缝
+                var d = Buffer(seconds);
+                var rnd = new System.Random(7723);
+                float[] bass = { 55f, 55f, 65.41f, 82.41f };
+                for (int i = 0; i < d.Length; i++)
+                {
+                    float t = i / (float)R;
+                    int bi = ((int)(t / beat)) % bass.Length;
+                    float lb = t - (int)(t / beat) * beat;
+                    // 脉冲低音
+                    float sq = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * bass[bi] * t)) * 0.20f * Mathf.Exp(-lb * 3.5f);
+                    // A minor pad
+                    float pad = (Mathf.Sin(2f * Mathf.PI * 220f * t)
+                               + Mathf.Sin(2f * Mathf.PI * 261.63f * t)
+                               + Mathf.Sin(2f * Mathf.PI * 329.63f * t)) * 0.085f;
+                    pad *= 0.70f + 0.30f * Mathf.Sin(2f * Mathf.PI * 0.25f * t);
+                    // hi-hat
+                    float hstep = beat * 0.5f;
+                    float lh = t % hstep;
+                    float hh = 0f;
+                    if (lh < 0.03f)
+                        hh = (float)(rnd.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-lh * 120f) * 0.09f;
+                    d[i] = sq + pad + hh;
+                }
+                Normalize(d, 0.52f);
+                return Make("bgm_neon", d);
+            }
+
+            public static AudioClip MusicGate()
+            {
+                float seconds = 12f;
+                var d = Buffer(seconds);
+                float[] chord = { 110f, 164.81f, 220f, 277.18f, 329.63f };
+                for (int i = 0; i < d.Length; i++)
+                {
+                    float t = i / (float)R;
+                    float v = 0f;
+                    for (int k = 0; k < chord.Length; k++)
+                    {
+                        float f = Mathf.Round(chord[k] * seconds) / seconds;
+                        float lfo = 0.60f + 0.40f * Mathf.Sin(2f * Mathf.PI * (0.0833f * (k + 1)) * t);
+                        v += Mathf.Sin(2f * Mathf.PI * f * t) * 0.15f * lfo;
+                    }
+                    float shimmer = Mathf.Sin(2f * Mathf.PI * 1760f * t)
+                                  * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * 0.25f * t)) * 0.022f;
+                    float sweep = Mathf.Sin(2f * Mathf.PI * (880f - 300f * (t / seconds)) * t)
+                                * 0.028f * Mathf.Sin(2f * Mathf.PI * 0.0833f * t);
+                    d[i] = v + shimmer + sweep;
+                }
+                Normalize(d, 0.45f);
+                return Make("bgm_gate", d);
             }
 
             public static AudioClip MusicCalm()

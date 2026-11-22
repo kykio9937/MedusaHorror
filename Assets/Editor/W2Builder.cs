@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using Cinemachine;
 using UnityEditor;
@@ -529,22 +529,28 @@ namespace MedusaHorror.EditorTools
             {
                 new QuestDef { id = "w2_scrap", npcName = "老周", title = "修好水泵",
                     desc = "水泵散架了，帮我捡 4 块废铁回来。", kind = QuestKind.Collect,
-                    targetTag = "scrap", need = 4, rewardCoins = 120, rewardSpeed = 0.08f },
+                    targetTag = "scrap", need = 4, rewardCoins = 120, rewardSpeed = 0.08f,
+                    chain = "village" },
                 new QuestDef { id = "w2_herb", npcName = "阿霞", title = "熬一锅药",
                     desc = "药罐子见底了，帮我采 3 株苦艾草。", kind = QuestKind.Collect,
-                    targetTag = "herb", need = 3, rewardCoins = 100, rewardPetrify = 0.10f },
+                    targetTag = "herb", need = 3, rewardCoins = 100, rewardPetrify = 0.10f,
+                    chain = "remedy" },
                 new QuestDef { id = "w2_ammo", npcName = "铁柱", title = "补点家伙",
                     desc = "枪膛空了，帮我找 3 盒旧子弹。", kind = QuestKind.Collect,
-                    targetTag = "ammo", need = 3, rewardCoins = 150, rewardDamage = 0.10f },
+                    targetTag = "ammo", need = 3, rewardCoins = 150, rewardDamage = 0.10f,
+                    chain = "arms" },
                 new QuestDef { id = "w2_toy", npcName = "小满", title = "找我的娃娃",
                     desc = "我的娃娃丢在广场附近了，能帮我找回来吗？", kind = QuestKind.Collect,
-                    targetTag = "toy", need = 2, rewardCoins = 60, rewardSpeed = 0.03f },
+                    targetTag = "toy", need = 2, rewardCoins = 60, rewardSpeed = 0.03f,
+                    chain = "remedy", requires = "w2_herb" },
                 new QuestDef { id = "w2_battery", npcName = "老陈", title = "续上电",
                     desc = "发电机的电池都没电了，帮我收 5 节旧电池。", kind = QuestKind.Collect,
-                    targetTag = "battery", need = 5, rewardCoins = 200 },
+                    targetTag = "battery", need = 5, rewardCoins = 200,
+                    chain = "village", requires = "w2_scrap" },
                 new QuestDef { id = "w2_part", npcName = "灰帽", title = "拼个东西",
                     desc = "我在拼一台能用的收音机，缺 6 个零件。", kind = QuestKind.Collect,
-                    targetTag = "part", need = 6, rewardCoins = 300, rewardDamage = 0.05f }
+                    targetTag = "part", need = 6, rewardCoins = 300, rewardDamage = 0.05f,
+                    chain = "village", requires = "w2_battery" }
             };
 
             // 路面顶面约 0.28m，NPC 原点在脚底，抬到路面上

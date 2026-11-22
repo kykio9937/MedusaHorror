@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MedusaHorror.Core;
 
 namespace MedusaHorror.Gameplay
@@ -50,7 +50,12 @@ namespace MedusaHorror.Gameplay
             get
             {
                 if (QuestSystem.Claimed(def.id)) return def.npcName + "（已交付）";
-                if (!QuestSystem.Accepted(def.id)) return "交谈 · " + def.npcName;
+                if (!QuestSystem.Accepted(def.id))
+                {
+                    if (!QuestSystem.CanAccept(def.id))
+                        return "需要先完成「" + QuestSystem.RequiresTitle(def.id) + "」";
+                    return "交谈 · " + def.npcName;
+                }
                 if (QuestSystem.Ready(def.id)) return "交付 · " + def.title;
                 return "查看进度 · " + def.title;
             }
@@ -65,6 +70,11 @@ namespace MedusaHorror.Gameplay
 
             if (!QuestSystem.Accepted(def.id))
             {
+                if (!QuestSystem.CanAccept(def.id))
+                {
+                    LootToast.Show("「" + def.npcName + "」：先完成「" + QuestSystem.RequiresTitle(def.id) + "」，再来找我。");
+                    return;
+                }
                 QuestSystem.Accept(def.id);
                 LootToast.Show("「" + def.npcName + "」：" + def.desc);
                 return;

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MedusaHorror.Player
 {
@@ -48,12 +48,14 @@ namespace MedusaHorror.Player
 
         CharacterController _cc;
         Animator _anim;
+        MedusaHorror.Gameplay.PlayerPetrify _petrify;
 
         float _targetYaw;      // 鼠标累积出的目标水平朝向
         float _currentYaw;
         float _yawVelocity;
         float _planarSpeed;    // 当前水平速度（米/秒）
         float _verticalVelocity;
+        int _airJumpsUsed;
         float _animSpeed;
         float _animSpeedVelocity;
         float _lastGroundedTime;
@@ -84,6 +86,7 @@ namespace MedusaHorror.Player
             if (_cc == null) _cc = GetComponent<CharacterController>();
             if (_anim == null) _anim = GetComponent<Animator>();
             if (input == null) input = GetComponent<InputReader>();
+            if (_petrify == null) _petrify = GetComponent<MedusaHorror.Gameplay.PlayerPetrify>();
 
             _targetYaw = transform.eulerAngles.y;
             _currentYaw = _targetYaw;
@@ -131,7 +134,11 @@ namespace MedusaHorror.Player
             // 目标速度：有输入时按 Shift 在走/跑之间切换；任务奖励的移速加成在这里生效
             float targetSpeed = 0f;
             if (hasInput)
-                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier;
+            {
+                // 半石化（>=70%）移动减速，玩家能直观感到"身体在僵硬"
+                float petrifyScale = (_petrify != null && _petrify.IsHalfPetrified) ? 0.6f : 1f;
+                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier * petrifyScale;
+            }
 
             float rate = _planarSpeed < targetSpeed ? acceleration : deceleration;
             _planarSpeed = Mathf.MoveTowards(_planarSpeed, targetSpeed, rate * Time.deltaTime);
@@ -145,15 +152,21 @@ namespace MedusaHorror.Player
             }
 
             bool grounded = _cc.isGrounded;
-            if (grounded) _lastGroundedTime = Time.time;
+            if (grounded) { _lastGroundedTime = Time.time; _airJumpsUsed = 0; }
 
             if (grounded && _verticalVelocity < 0f) _verticalVelocity = groundStickVelocity;
 
             bool canJump = grounded || (coyoteTime > 0f && Time.time - _lastGroundedTime <= coyoteTime);
-            if (canJump && input.JumpPressed)
+            if (input.JumpPressed)
             {
-                _verticalVelocity = Mathf.Sqrt(2f * jumpHeight * Mathf.Abs(gravity));
-                if (_hasJumpParam && _anim != null) _anim.SetTrigger(jumpParam);
+                // 义体「神经反射插件」解锁空中二段跳，每次离地只给一次
+                bool airJump = !canJump && _airJumpsUsed < 1 && MedusaHorror.Core.SaveSystem.Data.doubleJump;
+                if (canJump || airJump)
+                {
+                    if (airJump) _airJumpsUsed++;
+                    _verticalVelocity = Mathf.Sqrt(2f * jumpHeight * Mathf.Abs(gravity));
+                    if (_hasJumpParam && _anim != null) _anim.SetTrigger(jumpParam);
+                }
             }
 
             _verticalVelocity += gravity * Time.deltaTime;

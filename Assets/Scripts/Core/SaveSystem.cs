@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -56,6 +56,21 @@ namespace MedusaHorror.Core
         public List<QuestState> quests = new List<QuestState>();
         [Tooltip("已购置的房屋 id")]
         public List<string> houses = new List<string>();
+        [Tooltip("村庄支线完成后的补给折扣（0~1）")]
+        public float villageDiscount = 0f;
+        [Tooltip("已购置的家具 id")]
+        public List<string> furniture = new List<string>();
+        [Tooltip("家中仓库存储的信用点")]
+        public int houseStorage = 0;
+
+        [Header("义体能力（W4 商店购买）")]
+        public bool doubleJump = false;
+        [Tooltip("已购买的商店商品 id")]
+        public List<string> shopPurchases = new List<string>();
+        [Tooltip("已看过的结局 id")]
+        public List<string> endingsSeen = new List<string>();
+        [Tooltip("地铁随机遭遇走到过的最深层数")]
+        public int subwayBestDepth = 0;
 
         [Header("属性加成（任务奖励累积）")]
         public float speedBonus = 0f;
@@ -224,6 +239,9 @@ namespace MedusaHorror.Core
             if (d.activatedPortals == null) d.activatedPortals = new List<string>();
             if (d.quests == null) d.quests = new List<QuestState>();
             if (d.houses == null) d.houses = new List<string>();
+            if (d.furniture == null) d.furniture = new List<string>();
+            if (d.shopPurchases == null) d.shopPurchases = new List<string>();
+            if (d.endingsSeen == null) d.endingsSeen = new List<string>();
         }
 
         static int ReadActiveSlot()

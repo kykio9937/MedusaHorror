@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using MedusaHorror.Core;
 
@@ -28,6 +28,11 @@ namespace MedusaHorror.Gameplay
         public float rewardSpeed = 0f;
         public float rewardDamage = 0f;
         public float rewardPetrify = 0f;
+
+        [Tooltip("所属支线（如 village），整条完成触发全局奖励")]
+        public string chain = "";
+        [Tooltip("前置任务 id：该任务领奖后才可接取本任务")]
+        public string requires = "";
     }
 
     /// <summary>
@@ -61,6 +66,52 @@ namespace MedusaHorror.Gameplay
             var s = new QuestState { id = id };
             list.Add(s);
             return s;
+        }
+
+        /// <summary>前置任务是否已领奖；无前置视为可接。</summary>
+        public static bool CanAccept(string id)
+        {
+            var d = Get(id);
+            if (d == null || string.IsNullOrEmpty(d.requires)) return true;
+            return Claimed(d.requires);
+        }
+
+        public static string RequiresTitle(string id)
+        {
+            var d = Get(id);
+            if (d == null || string.IsNullOrEmpty(d.requires)) return "";
+            var pre = Get(d.requires);
+            return pre != null ? pre.title : d.requires;
+        }
+
+        /// <summary>整条支线的所有任务是否都已领奖。</summary>
+        public static bool ChainComplete(string chain)
+        {
+            if (string.IsNullOrEmpty(chain)) return false;
+            bool any = false;
+            foreach (var kv in _defs)
+            {
+                if (kv.Value.chain != chain) continue;
+                any = true;
+                if (!Claimed(kv.Key)) return false;
+            }
+            return any;
+        }
+
+        public static int ChainDone(string chain)
+        {
+            int done = 0;
+            foreach (var kv in _defs)
+                if (kv.Value.chain == chain && Claimed(kv.Key)) done++;
+            return done;
+        }
+
+        public static int ChainTotal(string chain)
+        {
+            int total = 0;
+            foreach (var kv in _defs)
+                if (kv.Value.chain == chain) total++;
+            return total;
         }
 
         public static bool Accepted(string id) { return State(id).accepted; }
@@ -119,6 +170,17 @@ namespace MedusaHorror.Gameplay
             if (d.rewardSpeed > 0f) PlayerStats.AddSpeed(d.rewardSpeed);
             if (d.rewardDamage > 0f) PlayerStats.AddDamage(d.rewardDamage);
             if (d.rewardPetrify > 0f) PlayerStats.AddPetrifyResist(d.rewardPetrify);
+
+            // 整条支线完成：村庄复兴解锁补给/票价折扣
+            if (!string.IsNullOrEmpty(d.chain) && ChainComplete(d.chain))
+            {
+                if (d.chain == "village" && SaveSystem.Data.villageDiscount < 0.15f)
+                {
+                    SaveSystem.Data.villageDiscount = 0.15f;
+                    LootToast.Show("村庄复兴！补给与票价 8.5 折");
+                    Debug.Log("[Quest] 村庄支线完成，解锁 15% 折扣");
+                }
+            }
 
             SaveSystem.Save();
             Notify();

@@ -1,4 +1,4 @@
-using MedusaHorror.Player;
+﻿using MedusaHorror.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -53,6 +53,8 @@ namespace MedusaHorror.Gameplay
         public float Value { get { return value; } }
         public float Normalized { get { return maxValue <= 0f ? 0f : Mathf.Clamp01(value / maxValue); } }
         public bool Petrified { get { return petrified; } }
+        /// <summary>半石化：累积达到 70% 且尚未完全石化时移动减速。</summary>
+        public bool IsHalfPetrified { get { return !petrified && Normalized >= 0.7f; } }
         public int StruggleCount { get { return struggle; } }
         public int StruggleRequired { get { return struggleRequired; } }
 
@@ -60,10 +62,13 @@ namespace MedusaHorror.Gameplay
         InputReader input;
         float flash;
         float hudAlpha;
+        float hurtFlash;
+        float damageAlpha;
 
         Canvas canvas;
         CanvasGroup overlayGroup;
         Image crackImage;
+        Image damageImage;
         RectTransform crackRect;
         Image gazeFill;
         RectTransform gazeFillRect;
@@ -101,7 +106,9 @@ namespace MedusaHorror.Gameplay
             if (weightedRate > 0f) gazeTime += dt;
             // 任务奖励的石化抗性按比例削减累积速度
             float resistScale = 1f - MedusaHorror.Core.PlayerStats.PetrifyResist;
+            float before = value;
             value = Mathf.Min(maxValue, value + weightedRate * dt * resistScale);
+            if (weightedRate > 0f && value - before > 0.55f) hurtFlash = 1f;
             if (value >= maxValue) EnterPetrified();
         }
 
@@ -125,6 +132,7 @@ namespace MedusaHorror.Gameplay
                 if (value <= 0f) { value = 0f; gazeTime = 0f; }
             }
             if (flash > 0f) flash = Mathf.Max(0f, flash - dt * 3.4f);
+            if (hurtFlash > 0f) hurtFlash = Mathf.Max(0f, hurtFlash - dt * 1.8f);
             UpdatePetrifyAudio();
             UpdateHud(dt);
         }
@@ -137,6 +145,10 @@ namespace MedusaHorror.Gameplay
             float n = maxValue > 0f ? value / maxValue : 0f;
             if (petrified) audio.SetPetrifyIntensity(0f);
             else audio.SetPetrifyIntensity(n);
+
+            // 低血量等价于高石化：>=55% 开始心跳，越接近满值越快
+            if (!petrified && n >= 0.55f) audio.SetHeartbeatIntensity(Mathf.InverseLerp(0.55f, 1f, n));
+            else audio.SetHeartbeatIntensity(0f);
         }
 
         void EnterPetrified()
@@ -218,6 +230,17 @@ namespace MedusaHorror.Gameplay
             crackImage.color = new Color(stoneColor.r, stoneColor.g, stoneColor.b, 0f);
             overlayGroup = crackGo.AddComponent<CanvasGroup>();
             overlayGroup.blocksRaycasts = false;
+
+            // 受击红屏（红色暗角）：石化快速累积 / 濒临石化时浮现
+            var dmgGo = new GameObject("DamageVignette", typeof(RectTransform));
+            dmgGo.transform.SetParent(canvasGo.transform, false);
+            var drt = dmgGo.GetComponent<RectTransform>();
+            Stretch(drt);
+            damageImage = dmgGo.AddComponent<Image>();
+            damageImage.sprite = GetDamageSprite();
+            damageImage.type = Image.Type.Simple;
+            damageImage.raycastTarget = false;
+            damageImage.color = new Color(1f, 0.1f, 0.08f, 0f);
 
             // 凝视累积条
             var barBg = MakeImage("GazeBarBg", canvasGo.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -397,6 +420,17 @@ namespace MedusaHorror.Gameplay
             }
             if (overlayGroup != null) overlayGroup.alpha = Mathf.Clamp01(hudAlpha + flash * 0.3f);
 
+            // 受击红屏：濒危度 + 突增脉冲
+            float danger = petrified ? 1f : Mathf.Clamp01((n - 0.45f) / 0.55f);
+            float dmgTarget = danger * 0.5f + hurtFlash * 0.5f;
+            damageAlpha = Mathf.MoveTowards(damageAlpha, dmgTarget, dt * (hurtFlash > 0.4f ? 7f : 2.2f));
+            if (damageImage != null)
+            {
+                var dc = damageImage.color;
+                dc.a = Mathf.Clamp01(damageAlpha);
+                damageImage.color = dc;
+            }
+
             // 状态文字
             if (stateText != null)
             {
@@ -410,9 +444,14 @@ namespace MedusaHorror.Gameplay
                     stateText.text = "石化中 · 连按空格挣脱";
                     stateText.color = new Color(1f, 0.72f, 0.42f, 1f);
                 }
+                else if (IsHalfPetrified)
+                {
+                    stateText.text = "半石化 · 移动迟缓 " + Mathf.RoundToInt(n * 100f) + "%（快移出视线！）";
+                    stateText.color = new Color(1f, 0.55f, 0.40f, 0.85f);
+                }
                 else if (n > 0.02f)
                 {
-                    stateText.text = "被凝视 · 石化 " + Mathf.RoundToInt(n * 100f) + "%" + (n > 0.7f ? "（快移出视线！）" : "");
+                    stateText.text = "被凝视 · 石化 " + Mathf.RoundToInt(n * 100f) + "%";
                     stateText.color = new Color(0.90f, 0.90f, 0.86f, 0.5f + 0.5f * n);
                 }
                 else
@@ -455,6 +494,40 @@ namespace MedusaHorror.Gameplay
         }
 
         // ---------------- 程序化石化纹路 ----------------
+
+        static Sprite _damageSprite;
+
+        static Sprite GetDamageSprite()
+        {
+            if (_damageSprite != null) return _damageSprite;
+            var tex = BuildDamageTexture(256);
+            _damageSprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            _damageSprite.name = "DamageVignette";
+            return _damageSprite;
+        }
+
+        static Texture2D BuildDamageTexture(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x / (float)size - 0.5f) * 2f;
+                    float v = (y / (float)size - 0.5f) * 2f;
+                    float rad = Mathf.Sqrt(u * u + v * v);
+                    float a = Mathf.Clamp01((rad - 0.42f) / 0.58f);
+                    a = a * a * 1.15f;
+                    px[y * size + x] = new Color32(255, 40, 32, (byte)(Mathf.Clamp01(a) * 255f));
+                }
+            }
+            tex.SetPixels32(px);
+            tex.Apply();
+            return tex;
+        }
 
         static Sprite GetCrackSprite()
         {

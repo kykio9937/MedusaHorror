@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MedusaHorror.Core;
 
 namespace MedusaHorror.Gameplay
@@ -38,7 +38,7 @@ namespace MedusaHorror.Gameplay
             get
             {
                 if (Owned) return houseName + " · 已购置";
-                return "购买「" + houseName + "」· " + price + " 信用点";
+                return "购买「" + houseName + "」· " + MedusaHorror.Core.Pricing.Apply(price) + " 信用点" + MedusaHorror.Core.Pricing.Tag(price);
             }
         }
 
@@ -47,15 +47,16 @@ namespace MedusaHorror.Gameplay
         public void Interact()
         {
             if (Owned) return;
-            if (!Wallet.CanAfford(price))
+            int cost = MedusaHorror.Core.Pricing.Apply(price);
+            if (!Wallet.CanAfford(cost))
             {
-                LootToast.Show("信用点不足 · 需要 " + price + "，现有 " + Wallet.Coins);
+                LootToast.Show("信用点不足 · 需要 " + cost + "，现有 " + Wallet.Coins);
                 var a0 = AudioDirector.Instance;
                 if (a0 != null) a0.PlayAt(SfxId.DoorLocked, transform.position, 0.7f, 1f);
                 return;
             }
 
-            Wallet.Spend(price);
+            Wallet.Spend(cost);
             SaveSystem.Data.houses.Add(houseId);
             SaveSystem.Save();
             if (door != null) door.Unlock();

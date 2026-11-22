@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -352,6 +352,12 @@ namespace MedusaHorror.EditorTools
             portal.upperY = 6.9f;
 
             // 让 ExitPortal 找得到光幕：直接把 veil 挂在 gateRoot 下（已在）
+            // 星门控制台：多结局选择点，放在门前 6m 侧面
+            var consoleGo = LevelKit.Slab("EndingConsole", root, new Vector3(3.2f, 0.9f, GATE_Z - 6f),
+                new Vector3(0.5f, 1.4f, 0.5f), glowMat != null ? glowMat : vr2.sharedMaterial);
+            consoleGo.AddComponent<MedusaHorror.Gameplay.EndingChoice>();
+            sb.AppendLine("[W5] 结局控制台 pos=(3.2, " + (GATE_Z - 6f) + ")");
+
             sb.AppendLine("[W5] 星门就位 pos=" + gateRoot.transform.position.ToString("F1"));
         }
 

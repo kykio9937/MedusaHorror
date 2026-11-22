@@ -1,4 +1,4 @@
-// 调试命令通道：仅编辑器与显式开启 MARVIS_DEBUG 的构建中编译。
+﻿// 调试命令通道：仅编辑器与显式开启 MARVIS_DEBUG 的构建中编译。
 // 本文件位于 Assets/Editor 下，本身就参与编辑器程序集、不会进入正式包；
 // 这里再加一层条件编译，保证即使被移到运行时目录也不会被打进构建。
 #if UNITY_EDITOR || MARVIS_DEBUG
@@ -1134,6 +1134,16 @@ public static class W1Pump
 
 
 
+    static string PzSet(string[] parts)
+    {
+        var pt = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.PlayerPetrify>();
+        if (pt == null) return "[PZSET] 未找到 PlayerPetrify";
+        float v = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : 0f;
+        pt.value = Mathf.Clamp(v, 0f, pt.maxValue);
+        return "[PZSET] value=" + pt.value.ToString("F1") + " n=" + pt.Normalized.ToString("F2") +
+               " half=" + pt.IsHalfPetrified;
+    }
+
     static string PzReset()
 
 
@@ -1435,6 +1445,161 @@ public static class W1Pump
         if (op == "START") return MenuStart();
         if (op == "MENUOPEN") return MenuOpen(parts);
         if (op == "SAVERELOAD") return SaveReload();
+        if (op == "QUESTSTATE") return QuestStateReport();
+        if (op == "QUESTACCEPT") return QuestAcceptDbg(parts);
+        if (op == "QUESTPROG") return QuestProgDbg(parts);
+        if (op == "QUESTCLAIM") return QuestClaimDbg(parts);
+        if (op == "HOUSEOWN")
+        {
+            var hs = MedusaHorror.Core.SaveSystem.Data.houses;
+            if (!hs.Contains("W4_Apartment_7B")) hs.Add("W4_Apartment_7B");
+            MedusaHorror.Core.SaveSystem.Save();
+            return "[HOUSEOWN] owned=1";
+        }
+        if (op == "HOUSESTATE")
+        {
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            return "[HOUSESTATE] houses=" + d.houses.Count + " furniture=" + string.Join(",", d.furniture.ToArray()) +
+                   " storage=" + d.houseStorage + " discount=" + d.villageDiscount.ToString("F2");
+        }
+        if (op == "PORTALACT")
+        {
+            if (parts.Length < 2) return "[PORTALACT] 缺少场景名";
+            var pl = MedusaHorror.Core.SaveSystem.Data.activatedPortals;
+            string k = parts[1] + "|portal";
+            if (!pl.Contains(k)) pl.Add(k);
+            MedusaHorror.Core.SaveSystem.Save();
+            return "[PORTALACT] count=" + pl.Count;
+        }
+        if (op == "FTDIAG")
+        {
+            var ft = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.FastTravelPoint>();
+            if (ft == null) return "FTDIAG=NULL";
+            return "[FTDIAG] open=" + ft.IsOpen + " targets=" + ft.TargetCount + " hint=" + ft.Hint;
+        }
+        if (op == "FTTRAVEL")
+        {
+            var ft = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.FastTravelPoint>();
+            if (ft == null) return "FTTRAVEL=NULL";
+            if (parts.Length > 1) ft.TravelTo(int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture));
+            return "[FTTRAVEL] open=" + ft.IsOpen + " targets=" + ft.TargetCount;
+        }
+        if (op == "SHOPDIAG")
+        {
+            var shops = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.ShopPoint>();
+            var sb2 = new System.Text.StringBuilder("[SHOPDIAG]");
+            for (int i = 0; i < shops.Length; i++)
+                sb2.Append(" " + shops[i].name + "(" + shops[i].GoodsCount + ",open=" + shops[i].IsOpen + ")");
+            return sb2.ToString();
+        }
+        if (op == "SHOPBUY")
+        {
+            var shops = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.ShopPoint>();
+            MedusaHorror.Gameplay.ShopPoint target = null;
+            if (parts.Length > 1)
+                for (int i = 0; i < shops.Length; i++) if (shops[i].name == parts[1]) target = shops[i];
+            if (target == null && shops.Length > 0) target = shops[0];
+            if (target == null) return "SHOPBUY=NULL";
+            int idx = parts.Length > 2 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : 0;
+            bool ok = target.Buy(idx);
+            return "[SHOPBUY] " + target.name + " idx=" + idx + " ok=" + ok + " coins=" + MedusaHorror.Core.Wallet.Coins;
+        }
+        if (op == "SHOPSTATE")
+        {
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            return "[SHOPSTATE] purchases=" + string.Join(",", d.shopPurchases.ToArray()) +
+                   " doubleJump=" + d.doubleJump + " coins=" + d.coins +
+                   " dmg=" + d.damageBonus.ToString("F2") + " spd=" + d.speedBonus.ToString("F2");
+        }
+        if (op == "ENDINGDIAG")
+        {
+            var ec = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.EndingChoice>();
+            if (ec == null) return "ENDINGDIAG=NULL";
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            return "[ENDINGDIAG] count=" + ec.EndingCount + " open=" + ec.IsOpen +
+                   " seen=" + string.Join(",", d.endingsSeen.ToArray()) +
+                   " coins=" + d.coins + " discount=" + d.villageDiscount.ToString("F2") +
+                   " houses=" + d.houses.Count;
+        }
+        if (op == "ENDINGPICK")
+        {
+            var ec = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.EndingChoice>();
+            if (ec == null) return "ENDINGPICK=NULL";
+            int idx = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            bool ok = ec.Choose(idx);
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            return "[ENDINGPICK] idx=" + idx + " ok=" + ok + " seen=" + string.Join(",", d.endingsSeen.ToArray());
+        }
+        if (op == "SUBDIAG")
+        {
+            var list = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.SubwayEncounter>();
+            var sb3 = new System.Text.StringBuilder("[SUBDIAG] n=" + list.Length);
+            for (int i = 0; i < list.Length; i++)
+                sb3.Append(" " + list[i].name + "(depth=" + list[i].Depth + ",open=" + list[i].IsOpen + ")");
+            sb3.Append(" best=" + MedusaHorror.Core.SaveSystem.Data.subwayBestDepth);
+            return sb3.ToString();
+        }
+        if (op == "SUBOPEN")
+        {
+            var list = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.SubwayEncounter>();
+            if (list.Length == 0) return "SUBOPEN=NULL";
+            int i0 = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            if (i0 < 0 || i0 >= list.Length) return "SUBOPEN=INDEX";
+            list[i0].Interact();
+            return "[SUBOPEN] " + list[i0].name + " depth=" + list[i0].Depth + " open=" + list[i0].IsOpen;
+        }
+        if (op == "SUBEVENT")
+        {
+            var list = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.SubwayEncounter>();
+            if (list.Length == 0) return "SUBEVENT=NULL";
+            int i0 = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            int e0 = parts.Length > 2 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : 0;
+            if (i0 < 0 || i0 >= list.Length) return "SUBEVENT=INDEX";
+            list[i0].ForceEvent(e0);
+            return "[SUBEVENT] " + list[i0].name + " event=" + e0;
+        }
+        if (op == "SUBPICK")
+        {
+            var list = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.SubwayEncounter>();
+            if (list.Length == 0) return "SUBPICK=NULL";
+            int i0 = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            int opt = parts.Length > 2 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : 0;
+            if (i0 < 0 || i0 >= list.Length) return "SUBPICK=INDEX";
+            list[i0].Choose(opt);
+            return "[SUBPICK] " + list[i0].name + " opt=" + opt + " depth=" + list[i0].Depth +
+                   " best=" + MedusaHorror.Core.SaveSystem.Data.subwayBestDepth +
+                   " coins=" + MedusaHorror.Core.Wallet.Coins;
+        }
+        if (op == "CROWDDIAG")
+        {
+            var list = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.CrowdWalker>();
+            var sb4 = new System.Text.StringBuilder("[CROWDDIAG] n=" + list.Length);
+            for (int i = 0; i < list.Length && i < 3; i++)
+                sb4.Append(" " + list[i].name + list[i].transform.position.ToString("F1"));
+            return sb4.ToString();
+        }
+        if (op == "RAINOFF" || op == "RAINON")
+        {
+            var r = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.NeonRain>();
+            if (r == null) return "RAIN=NULL";
+            r.SetRainEnabled(op == "RAINON");
+            return "[" + op + "] done";
+        }
+        if (op == "RAINDIAG")
+        {
+            var r = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.NeonRain>();
+            if (r == null) return "RAINDIAG=NULL";
+            var ps = r.GetComponentsInChildren<ParticleSystem>();
+            var sb5 = new System.Text.StringBuilder("[RAINDIAG] systems=" + ps.Length);
+            for (int i = 0; i < ps.Length; i++) sb5.Append(" " + ps[i].name + "=" + ps[i].particleCount + "/" + ps[i].isPlaying);
+            return sb5.ToString();
+        }
+        if (op == "BGM")
+        {
+            var au = MedusaHorror.Core.AudioDirector.Instance;
+            if (au == null) return "BGM=NULL";
+            return "[BGM] key=" + au.SceneMusicKey + " " + au.BgmPlayState + " heart=" + au.HeartbeatPlaying;
+        }
 
 
 
@@ -2147,6 +2312,7 @@ public static class W1Pump
 
 
         if (op == "PZRESET") return PzReset();
+        if (op == "PZSET") return PzSet(parts);
 
 
 
@@ -6586,7 +6752,10 @@ public static class W1Pump
 
 
 
-                + " val=" + pt.Value.ToString("F1") + " petrified=" + pt.Petrified
+                + " val=" + pt.Value.ToString("F1") + " n=" + pt.Normalized.ToString("F2")
+                + " half=" + pt.IsHalfPetrified
+                + " heart=" + (MedusaHorror.Core.AudioDirector.Instance != null && MedusaHorror.Core.AudioDirector.Instance.HeartbeatPlaying)
+                + " petrified=" + pt.Petrified
 
 
 
@@ -11833,6 +12002,52 @@ public static class W1Pump
         return "[MENUOPEN] 未找到 MainMenuScreen";
     }
 
+    static string QuestStateReport()
+    {
+        var sb = new System.Text.StringBuilder("[QUEST] discount=" + MedusaHorror.Core.SaveSystem.Data.villageDiscount.ToString("F2"));
+        var list = MedusaHorror.Core.SaveSystem.Data.quests;
+        for (int i = 0; i < list.Count; i++)
+        {
+            var st = list[i];
+            var def = MedusaHorror.Gameplay.QuestSystem.Get(st.id);
+            sb.AppendLine("  " + st.id + " acc=" + st.accepted + " prog=" + st.progress +
+                          (def != null ? "/" + def.need : "") + " claimed=" + st.claimed +
+                          (def != null && !string.IsNullOrEmpty(def.chain) ? " chain=" + def.chain : ""));
+        }
+        return sb.ToString();
+    }
+
+    static string QuestAcceptDbg(string[] parts)
+    {
+        if (parts.Length < 2) return "[QUESTACCEPT] 缺少 id";
+        string id = parts[1];
+        if (!MedusaHorror.Gameplay.QuestSystem.CanAccept(id))
+            return "[QUESTACCEPT] 前置未完成: " + MedusaHorror.Gameplay.QuestSystem.RequiresTitle(id);
+        MedusaHorror.Gameplay.QuestSystem.Accept(id);
+        return "[QUESTACCEPT] ok " + id;
+    }
+
+    static string QuestProgDbg(string[] parts)
+    {
+        if (parts.Length < 3) return "[QUESTPROG] 需要 id|n";
+        string id = parts[1];
+        int n = int.Parse(parts[2], CultureInfo.InvariantCulture);
+        var st = MedusaHorror.Gameplay.QuestSystem.State(id);
+        var def = MedusaHorror.Gameplay.QuestSystem.Get(id);
+        st.accepted = true;
+        st.progress = Mathf.Clamp(n, 0, def != null ? def.need : n);
+        if (def != null && st.progress >= def.need) st.completed = true;
+        return "[QUESTPROG] " + id + "=" + st.progress;
+    }
+
+    static string QuestClaimDbg(string[] parts)
+    {
+        if (parts.Length < 2) return "[QUESTCLAIM] 缺少 id";
+        bool ok = MedusaHorror.Gameplay.QuestSystem.Claim(parts[1]);
+        return "[QUESTCLAIM] " + (ok ? "ok" : "fail") + " " + parts[1] +
+               " discount=" + MedusaHorror.Core.SaveSystem.Data.villageDiscount.ToString("F2");
+    }
+
     static string SaveReload()
     {
         MedusaHorror.Core.SaveSystem.Load();
@@ -13322,18 +13537,24 @@ public static class W1Pump
 
 
         if (pz != null)
+        {
 
 
 
 
 
-            sb.AppendLine("PZ value=" + pz.value.ToString("F2") + " petrified=" + pz.petrified +
+            var _aud = MedusaHorror.Core.AudioDirector.Instance;
+            sb.AppendLine("PZ value=" + pz.value.ToString("F2") + " n=" + pz.Normalized.ToString("F2") +
+                          " half=" + pz.IsHalfPetrified +
+                          " heart=" + (_aud != null && _aud.HeartbeatPlaying) +
+                          " petrified=" + pz.petrified +
 
 
 
 
 
                           " dead=" + pz.dead + " fillSec=" + pz.lastFillSeconds.ToString("F2"));
+        }
 
 
 

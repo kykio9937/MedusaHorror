@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -46,7 +46,10 @@ namespace MedusaHorror.EditorTools
             BuildNeon(root, sb);
             BuildBillboards(root, sb);
             BuildPlayerHouse(root, sb);
+            BuildShops(root, sb);
             int props = BuildProps(root, sb);
+            BuildCrowd(root, sb);
+            BuildWeather(root, sb);
             BuildAtmosphere(root, sb);
             var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 8f), 0f, sb, "W4");
             LevelKit.BuildCamera(player, "CM_W4_ThirdPerson", sb, "W4");
@@ -401,7 +404,128 @@ namespace MedusaHorror.EditorTools
             LevelKit.AddPointLight(house.transform, "PlaqueLight",
                 new Vector3(hx + w * 0.5f + 0.5f, 2.2f, hz + 1.55f), new Color(1f, 0.65f, 0.2f), 1.4f, 5f);
 
+            // 房屋功能化：存档点 / 仓库 / 家具购买点 / 租客任务
+            var bedT = house.transform.Find("HouseBed");
+            var savePoint = (bedT != null ? bedT.gameObject : house.gameObject).AddComponent<MedusaHorror.Gameplay.HouseSavePoint>();
+            savePoint.houseId = "W4_Apartment_7B";
+
+            var chest = LevelKit.Slab("HouseChest", house.transform, new Vector3(hx - 2.0f, 0.35f, hz + 2.6f),
+                new Vector3(0.9f, 0.7f, 0.6f), floorMat);
+            var storage = chest.AddComponent<MedusaHorror.Gameplay.HouseStorage>();
+            storage.houseId = "W4_Apartment_7B";
+
+            var sofa = LevelKit.Slab("HouseSofa", house.transform, new Vector3(hx + 1.5f, 0.42f, hz - 1.4f),
+                new Vector3(2.2f, 0.8f, 0.9f), floorMat);
+            sofa.SetActive(false);
+            var sofaShop = LevelKit.Slab("HouseSofaShop", house.transform, new Vector3(hx + 1.5f, 0.3f, hz - 1.4f),
+                new Vector3(0.5f, 0.6f, 0.5f), wallMat);
+            var fs = sofaShop.AddComponent<MedusaHorror.Gameplay.FurnitureShop>();
+            fs.houseId = "W4_Apartment_7B";
+            fs.furnitureId = "sofa";
+            fs.furnitureName = "沙发";
+            fs.price = 150;
+            fs.furnitureObject = sofa;
+
+            var shelf = LevelKit.Slab("HouseShelf", house.transform, new Vector3(hx - 2.0f, 1.0f, hz + 1.2f),
+                new Vector3(0.5f, 1.9f, 1.6f), wallMat);
+            shelf.SetActive(false);
+            var shelfShop = LevelKit.Slab("HouseShelfShop", house.transform, new Vector3(hx - 2.0f, 0.3f, hz + 1.2f),
+                new Vector3(0.5f, 0.6f, 0.5f), wallMat);
+            var fs2 = shelfShop.AddComponent<MedusaHorror.Gameplay.FurnitureShop>();
+            fs2.houseId = "W4_Apartment_7B";
+            fs2.furnitureId = "shelf";
+            fs2.furnitureName = "书架";
+            fs2.price = 200;
+            fs2.furnitureObject = shelf;
+
+            var npcPf = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Suriyun/Kazuko/Prefab/Kazuko.prefab");
+            if (npcPf != null)
+            {
+                var npcGo = (GameObject)PrefabUtility.InstantiatePrefab(npcPf, house.transform);
+                npcGo.name = "HouseTenant";
+                npcGo.transform.position = new Vector3(hx + 0.2f, 0.3f, hz - 2.4f);
+                npcGo.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+                var nq = npcGo.AddComponent<MedusaHorror.Gameplay.NpcQuestGiver>();
+                nq.def = new MedusaHorror.Gameplay.QuestDef
+                {
+                    id = "w4_home_light", npcName = "租客", title = "修好屋里的灯",
+                    desc = "灯坏了，帮我找 2 个零件回来。", kind = MedusaHorror.Gameplay.QuestKind.Collect,
+                    targetTag = "house_part", need = 2, rewardCoins = 300, chain = "home"
+                };
+            }
+
+            for (int i = 0; i < 2; i++)
+            {
+                var part = LevelKit.Slab("HousePart" + i, house.transform,
+                    new Vector3(hx - 1.5f + i * 2.4f, 0.35f, hz + 1.6f),
+                    new Vector3(0.28f, 0.28f, 0.28f), floorMat, false);
+                var qp = part.AddComponent<MedusaHorror.Gameplay.QuestPickup>();
+                qp.itemTag = "house_part";
+                qp.itemName = "旧零件";
+            }
+
+            // 快速旅行终端（门内侧）
+            var ftGo = LevelKit.Slab("FastTravelPoint", house.transform,
+                new Vector3(hx + 2.0f, 0.85f, hz + 0.9f),
+                new Vector3(0.34f, 1.0f, 0.34f), floorMat);
+            ftGo.AddComponent<MedusaHorror.Gameplay.FastTravelPoint>();
+
             sb.AppendLine("[W4] 可购公寓 pos=(" + hx + "," + hz + ") 价格=800");
+        }
+
+        /// <summary>街边两家店：武器强化店与义体店。</summary>
+        static void BuildShops(Transform root, StringBuilder sb)
+        {
+            var mat = LevelKit.LoadMat(MAT + "Metallic/Metal_01.mat");
+            if (mat == null) mat = LevelKit.LoadFirstMaterial(MAT + "Rough", null);
+
+            var weapon = LevelKit.Slab("WeaponShop", root, new Vector3(-9.0f, 0.5f, -18f),
+                new Vector3(1.6f, 1.0f, 2.4f), mat);
+            var ws = weapon.AddComponent<MedusaHorror.Gameplay.ShopPoint>();
+            ws.kind = MedusaHorror.Gameplay.ShopPoint.ShopKind.Weapon;
+            ws.shopName = "黑刃工坊";
+
+            var cyber = LevelKit.Slab("CyberShop", root, new Vector3(9.0f, 0.5f, 2f),
+                new Vector3(1.6f, 1.0f, 2.4f), mat);
+            var cs = cyber.AddComponent<MedusaHorror.Gameplay.ShopPoint>();
+            cs.kind = MedusaHorror.Gameplay.ShopPoint.ShopKind.Cyber;
+            cs.shopName = "义体门诊";
+
+            sb.AppendLine("[W4] 商店：黑刃工坊(-9,-18) 义体门诊(9,2)");
+        }
+
+        /// <summary>街上走动的行人：沿人行道来回巡逻。</summary>
+        static void BuildCrowd(Transform root, StringBuilder sb)
+        {
+            var npcPf = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Suriyun/Kazuko/Prefab/Kazuko.prefab");
+            if (npcPf == null) { sb.AppendLine("[W4] 人群：未找到 Kazuko 预制体"); return; }
+
+            float[] zs = { -38f, -26f, -12f, 0f, 10f, 22f, 34f, 42f };
+            int n = 0;
+            for (int i = 0; i < zs.Length; i++)
+            {
+                float side = (i % 2 == 0) ? -1f : 1f;
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(npcPf, root);
+                go.name = "CrowdWalker" + i;
+                float x = side * 9.2f;
+                go.transform.position = new Vector3(x, 0.3f, zs[i]);
+                go.transform.rotation = Quaternion.Euler(0f, side > 0f ? 180f : 0f, 0f);
+                var cw = go.AddComponent<MedusaHorror.Gameplay.CrowdWalker>();
+                cw.pointA = new Vector3(x, 0.3f, zs[i] - 6f);
+                cw.pointB = new Vector3(x, 0.3f, zs[i] + 6f);
+                cw.speed = 1.2f + (i % 3) * 0.2f;
+                n++;
+            }
+            sb.AppendLine("[W4] 人群=" + n);
+        }
+
+        /// <summary>霓虹雨：跟随玩家的雨幕与地面水花。</summary>
+        static void BuildWeather(Transform root, StringBuilder sb)
+        {
+            var go = new GameObject("NeonRain");
+            go.transform.SetParent(root, false);
+            go.AddComponent<MedusaHorror.Gameplay.NeonRain>();
+            sb.AppendLine("[W4] 天气：霓虹雨");
         }
 
         // ------------------------------------------------------------------ 杂物

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using MedusaHorror.UI;
@@ -44,12 +44,12 @@ namespace MedusaHorror.Core
             var audio = AudioDirector.Ensure();
             if (audio != null)
             {
-                audio.StartMusic();
+                audio.ApplySceneMusic(scene.name);
                 int adopted = 0;
                 if (scene.name == HospitalScene) audio.AdoptSceneAmbience();
                 adopted = audio.AdoptedAmbienceCount;
                 Debug.Log("[P0] 音频：mixer=" + (audio.MixerLoaded ? "loaded" : "missing") +
-                          " bgm=playing ambienceAdopted=" + adopted);
+                          " bgm=playing bgmKey=" + audio.SceneMusicKey + " ambienceAdopted=" + adopted);
             }
 
             // P0-2 失败 / 重开闭环：战斗关卡都需要局内流程中枢

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -40,6 +40,7 @@ namespace MedusaHorror.EditorTools
             BuildTunnelEnds(root, mats, sb);
             BuildLighting(root, sb);
             // 出生点避开南端隧道口铁轨（铁轨顶面 0.64m，站上去会把人托起来）
+            BuildEncounters(root, sb);
             var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 10f), 0f, sb, "W3");
             LevelKit.BuildCamera(player, "CM_W3_ThirdPerson", sb, "W3");
             // 地铁出口：需要先点亮，且要买票（200 信用点）才能乘车去霓虹街区
@@ -198,6 +199,25 @@ namespace MedusaHorror.EditorTools
                 new Vector3(3.6f, 4.4f, 0.6f), m.Wall);
 
             sb.AppendLine("[W3] 隧道端头完成");
+        }
+
+        /// <summary>站台随机遭遇点：主走廊与侧廊各一处。</summary>
+        static void BuildEncounters(Transform root, StringBuilder sb)
+        {
+            var mat = LevelKit.LoadFirstMaterial("Assets/Dark City 2/Subway/Materials", null);
+            if (mat == null) mat = LevelKit.LoadFirstMaterial("Assets/Dark City 2/Assets/Source/Materials/Rough", null);
+
+            var a = LevelKit.Slab("SubwayEncounterA", root, new Vector3(3.2f, 0.85f, 8f),
+                new Vector3(0.6f, 1.5f, 1.2f), mat);
+            var ea = a.AddComponent<MedusaHorror.Gameplay.SubwayEncounter>();
+            ea.encounterName = "废弃站台";
+
+            var b = LevelKit.Slab("SubwayEncounterB", root, new Vector3(-9.45f, 0.85f, -8f),
+                new Vector3(0.6f, 1.5f, 1.2f), mat);
+            var eb = b.AddComponent<MedusaHorror.Gameplay.SubwayEncounter>();
+            eb.encounterName = "侧廊深处";
+
+            sb.AppendLine("[W3] 随机遭遇点=2");
         }
 
         // ------------------------------------------------------------------ 平行侧廊（回路）
