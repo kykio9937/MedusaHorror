@@ -1433,6 +1433,8 @@ public static class W1Pump
 
 
         if (op == "START") return MenuStart();
+        if (op == "MENUOPEN") return MenuOpen(parts);
+        if (op == "SAVERELOAD") return SaveReload();
 
 
 
@@ -11815,6 +11817,30 @@ public static class W1Pump
 
 
 
+    }
+
+    static string MenuOpen(string[] parts)
+    {
+        string target = parts.Length > 1 ? parts[1] : "load";
+        var screens = Resources.FindObjectsOfTypeAll<MedusaHorror.UI.MainMenuScreen>();
+        foreach (var s in screens)
+        {
+            if (s == null || s.gameObject == null) continue;
+            if (string.IsNullOrEmpty(s.gameObject.scene.name)) continue;
+            MedusaHorror.UI.MainMenuScreen.debugOpenView = target;
+            return "[MENUOPEN] page=" + target + " queued on " + s.gameObject.name;
+        }
+        return "[MENUOPEN] 未找到 MainMenuScreen";
+    }
+
+    static string SaveReload()
+    {
+        MedusaHorror.Core.SaveSystem.Load();
+        var screen = UnityEngine.Object.FindObjectOfType<MedusaHorror.UI.MainMenuScreen>();
+        if (screen != null) screen.DebugRefresh();
+        return "[SAVERELOAD] any=" + MedusaHorror.Core.SaveSystem.HasAnySave +
+               " latest=" + MedusaHorror.Core.SaveSystem.LatestSlot +
+               " slot=" + MedusaHorror.Core.SaveSystem.CurrentSlot;
     }
 
 
