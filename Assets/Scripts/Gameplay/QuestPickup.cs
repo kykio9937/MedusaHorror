@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MedusaHorror.Core;
 using MedusaHorror.Player;
 
@@ -54,6 +54,7 @@ namespace MedusaHorror.Gameplay
         {
             _taken = true;
             QuestSystem.Report(QuestKind.Collect, itemTag, 1);
+            Inventory.Add(itemTag, itemName, 1, "在" + UnityEngine.SceneManagement.SceneManager.GetActiveScene().name + "拾得的任务物品", "任务");
             LootToast.Show("拾取 " + itemName);
             var audio = AudioDirector.Instance;
             if (audio != null) audio.PlayAt(SfxId.Pickup, transform.position, 0.7f, 1.2f);

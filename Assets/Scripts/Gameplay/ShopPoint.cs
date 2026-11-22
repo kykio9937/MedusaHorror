@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using MedusaHorror.Core;
@@ -161,7 +161,7 @@ namespace MedusaHorror.Gameplay
             go.transform.SetParent(transform, false);
             _canvas = go.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 95;
+            _canvas.sortingOrder = 200;
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -175,7 +175,7 @@ namespace MedusaHorror.Gameplay
             brt.offsetMin = Vector2.zero;
             brt.offsetMax = Vector2.zero;
             var img = bg.AddComponent<Image>();
-            img.color = new Color(0.02f, 0.03f, 0.05f, 0.86f);
+            img.color = new Color(0.02f, 0.03f, 0.05f, 0.97f);
 
             var txtGo = new GameObject("Body", typeof(RectTransform));
             txtGo.transform.SetParent(go.transform, false);

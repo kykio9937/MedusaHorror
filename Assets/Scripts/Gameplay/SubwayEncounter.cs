@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using MedusaHorror.Core;
 
@@ -79,6 +79,7 @@ namespace MedusaHorror.Gameplay
                 int price = Pricing.Apply(150);
                 if (!Wallet.Spend(price)) { LootToast.Show("信用点不够，贩子把布收了回去。"); return; }
                 PlayerStats.AddPetrifyResist(0.05f);
+                Inventory.Add("quartz", "石英粉", 1, "研磨过的石英粉，贴着皮肤能压住石化的蔓延", "消耗");
                 LootToast.Show("买到一罐石英粉 · 石化抗性 +5%");
             }
             else
@@ -196,7 +197,7 @@ namespace MedusaHorror.Gameplay
             go.transform.SetParent(transform, false);
             _canvas = go.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 95;
+            _canvas.sortingOrder = 200;
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -210,7 +211,7 @@ namespace MedusaHorror.Gameplay
             brt.offsetMin = Vector2.zero;
             brt.offsetMax = Vector2.zero;
             var img = bg.AddComponent<Image>();
-            img.color = new Color(0.02f, 0.03f, 0.05f, 0.86f);
+            img.color = new Color(0.02f, 0.03f, 0.05f, 0.97f);
 
             var txtGo = new GameObject("Body", typeof(RectTransform));
             txtGo.transform.SetParent(go.transform, false);

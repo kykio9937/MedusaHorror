@@ -1594,6 +1594,58 @@ public static class W1Pump
             for (int i = 0; i < ps.Length; i++) sb5.Append(" " + ps[i].name + "=" + ps[i].particleCount + "/" + ps[i].isPlaying);
             return sb5.ToString();
         }
+        if (op == "PANELOPEN")
+        {
+            var pp = MedusaHorror.UI.PlayerPanel.Ensure();
+            int pg = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            pp.Open(pg);
+            return "[PANELOPEN] page=" + pg + " open=" + pp.IsOpen;
+        }
+        if (op == "PANELCLOSE")
+        {
+            var pp = MedusaHorror.UI.PlayerPanel.Ensure();
+            pp.Close();
+            return "[PANELCLOSE] open=" + pp.IsOpen;
+        }
+        if (op == "ITEMADD")
+        {
+            if (parts.Length < 2) return "[ITEMADD] 缺少 id";
+            string iid = parts[1];
+            string iname = parts.Length > 2 ? parts[2] : iid;
+            string ikind = parts.Length > 3 ? parts[3] : "材料";
+            string idesc = parts.Length > 4 ? parts[4] : "调试添加";
+            MedusaHorror.Core.Inventory.Add(iid, iname, 1, idesc, ikind);
+            return "[ITEMADD] " + iid + " total=" + MedusaHorror.Core.Inventory.TotalCount;
+        }
+        if (op == "RESETSAVE")
+        {
+            MedusaHorror.Core.SaveSystem.ResetAll();
+            return "[RESETSAVE] coins=" + MedusaHorror.Core.SaveSystem.Data.coins;
+        }
+        if (op == "INVCLR")
+        {
+            MedusaHorror.Core.SaveSystem.Data.items.Clear();
+            MedusaHorror.Core.SaveSystem.Save();
+            return "[INVCLR] total=" + MedusaHorror.Core.Inventory.TotalCount;
+        }
+        if (op == "PSTATE")
+        {
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            float dmgMul = MedusaHorror.Core.PlayerStats.DamageMultiplier;
+            float spdMul = MedusaHorror.Core.PlayerStats.SpeedMultiplier;
+            var melee = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.MeleeWeapon>(true);
+            var gun = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.PlayerWeapon>(true);
+            var loadout = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.WeaponLoadout>(true);
+            string meleeS = melee != null ? (melee.damage.ToString("F0") + "->" + (melee.damage * dmgMul).ToString("F0")) : "none";
+            string gunS = gun != null ? (gun.damage.ToString("F0") + "->" + (gun.damage * dmgMul).ToString("F0") + " mag=" + gun.AmmoInMagazine + "/" + gun.MagazineSize) : "none";
+            return "[PSTATE] spdBonus=" + d.speedBonus.ToString("F2") + " spdMul=" + spdMul.ToString("F2") +
+                   " dmgBonus=" + d.damageBonus.ToString("F2") + " dmgMul=" + dmgMul.ToString("F2") +
+                   " resist=" + d.petrifyResist.ToString("F2") + " doubleJump=" + d.doubleJump +
+                   " coins=" + d.coins + " melee=" + meleeS + " gun=" + gunS +
+                   " weapon=" + (loadout != null ? loadout.Current.ToString() : "none") +
+                   " items=" + MedusaHorror.Core.Inventory.TotalCount +
+                   " houses=" + d.houses.Count + " purchases=" + d.shopPurchases.Count;
+        }
         if (op == "BGM")
         {
             var au = MedusaHorror.Core.AudioDirector.Instance;

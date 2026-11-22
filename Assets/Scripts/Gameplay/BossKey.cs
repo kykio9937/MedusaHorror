@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MedusaHorror.Gameplay
 {
@@ -102,6 +102,7 @@ namespace MedusaHorror.Gameplay
             if (gate != null) gate.OnKeyCollected();
             // 同一把 Boss 钥匙同时解封顶层传送门（独立于其它钥匙，不做复用）
             ExitPortal.GrantKey();
+            Core.Inventory.Add("key_" + displayName, displayName, 1, "锈迹斑斑的钥匙，能解开封锁的门", "钥匙");
             LootToast.Show("获得「" + displayName + "」 · 前路开启，顶层传送门可解封");
             var audio = Core.AudioDirector.Instance;
             if (audio != null) audio.PlayAt(Core.SfxId.Pickup, transform.position, 0.95f, 1f);

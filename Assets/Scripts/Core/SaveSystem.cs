@@ -30,6 +30,18 @@ namespace MedusaHorror.Core
         public bool claimed;
     }
 
+    /// <summary>背包物品堆叠：id 唯一，count 累加。</summary>
+    [Serializable]
+    public class ItemStack
+    {
+        public string id;
+        public string name;
+        public int count;
+        public string desc;
+        [Tooltip("任务 / 消耗 / 钥匙 / 材料")]
+        public string kind = "材料";
+    }
+
     /// <summary>
     /// 存档数据。JsonUtility 不支持字典，关卡记录用 List。
     /// </summary>
@@ -71,6 +83,8 @@ namespace MedusaHorror.Core
         public List<string> endingsSeen = new List<string>();
         [Tooltip("地铁随机遭遇走到过的最深层数")]
         public int subwayBestDepth = 0;
+        [Header("背包")]
+        public List<ItemStack> items = new List<ItemStack>();
 
         [Header("属性加成（任务奖励累积）")]
         public float speedBonus = 0f;
@@ -242,6 +256,7 @@ namespace MedusaHorror.Core
             if (d.furniture == null) d.furniture = new List<string>();
             if (d.shopPurchases == null) d.shopPurchases = new List<string>();
             if (d.endingsSeen == null) d.endingsSeen = new List<string>();
+            if (d.items == null) d.items = new List<ItemStack>();
         }
 
         static int ReadActiveSlot()

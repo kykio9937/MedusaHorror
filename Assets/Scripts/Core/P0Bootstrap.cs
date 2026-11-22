@@ -90,6 +90,10 @@ namespace MedusaHorror.Core
             wallet.SetShown(!inMenu);
             questHud.SetShown(!inMenu);
 
+            // 玩家面板（属性/装备/背包/帮助，Tab 打开）
+            var playerPanel = PlayerPanel.Ensure();
+            playerPanel.SetShown(!inMenu);
+
             // 反射探针：整搬进来的场景带实时探针，每帧渲染 6 面非常吃性能。
             // 统一改为按需刷新，并在加载后只渲染一次。
             var probes = Object.FindObjectsOfType<ReflectionProbe>(true);
