@@ -1,28 +1,28 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MedusaHorror.Player
 {
     /// <summary>
-    /// 玩家外观配色：V 键在三套配色间切换，只染衣服/护甲，不动皮肤和武器。
-    /// 玩家的骨骼动画和武器绑定保持不变，避免换模型带来的动作错位。
+    /// 玩家外观：V 键在三套配色间切换。
+    /// 角色模型用的是 UnityChan 自定义 shader，直接改材质颜色会渲染成黑色剪影，
+    /// 所以这里只改脚下的能量光环颜色，模型本体完全不动。
     /// </summary>
     public class PlayerSkin : MonoBehaviour
     {
         public static readonly string[] Names = { "默认", "暗夜", "赤红" };
 
-        static readonly Color[] Tints =
+        static readonly Color[] Colors =
         {
-            Color.white,
-            new Color(0.45f, 0.52f, 0.85f),
-            new Color(0.85f, 0.32f, 0.30f),
+            new Color(0.35f, 0.85f, 1f),
+            new Color(0.55f, 0.45f, 1f),
+            new Color(1f, 0.35f, 0.32f),
         };
 
         const string PrefKey = "medusa_player_skin";
 
         int _index;
-        Renderer[] _renders;
-        Color[] _origColors;
-        bool _captured;
+        Renderer _ringRenderer;
+        Material _ringMat;
 
         public int Index { get { return _index; } }
         public string SkinName { get { return Names[Mathf.Clamp(_index, 0, Names.Length - 1)]; } }
@@ -30,7 +30,7 @@ namespace MedusaHorror.Player
         void Start()
         {
             _index = Mathf.Clamp(PlayerPrefs.GetInt(PrefKey, 0), 0, Names.Length - 1);
-            Capture();
+            BuildRing();
             Apply();
         }
 
@@ -42,47 +42,65 @@ namespace MedusaHorror.Player
                 PlayerPrefs.SetInt(PrefKey, _index);
                 PlayerPrefs.Save();
                 Apply();
-                Gameplay.LootToast.Show("外观：" + SkinName);
+                Gameplay.LootToast.Show("光环：" + SkinName);
             }
         }
 
-        void Capture()
+        void BuildRing()
         {
-            if (_captured) return;
-            _renders = GetComponentsInChildren<Renderer>(true);
-            _origColors = new Color[_renders.Length];
-            for (int i = 0; i < _renders.Length; i++)
+            if (_ringRenderer != null) return;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "PlayerRing";
+            var col = go.GetComponent<Collider>();
+            if (col != null) { col.enabled = false; Destroy(col); }
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(0f, 0.04f, 0f);
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+
+            _ringMat = new Material(Shader.Find("Sprites/Default"));
+            _ringMat.mainTexture = MakeRingTexture();
+            var r = go.GetComponent<Renderer>();
+            r.sharedMaterial = _ringMat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            _ringRenderer = r;
+        }
+
+        static Texture2D MakeRingTexture()
+        {
+            const int S = 128;
+            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var px = new Color[S * S];
+            Vector2 c = new Vector2(S * 0.5f, S * 0.5f);
+            float outer = S * 0.48f;
+            float inner = S * 0.34f;
+            for (int y = 0; y < S; y++)
             {
-                var r = _renders[i];
-                if (r == null) continue;
-                var m = r.sharedMaterial;
-                _origColors[i] = (m != null && m.HasProperty("_Color")) ? m.color : Color.white;
+                for (int x = 0; x < S; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x, y), c);
+                    float a = 0f;
+                    if (d <= outer && d >= inner)
+                    {
+                        float t = Mathf.InverseLerp(inner, outer, d);
+                        a = Mathf.Sin(t * Mathf.PI) * 0.85f;
+                    }
+                    px[y * S + x] = new Color(1f, 1f, 1f, a);
+                }
             }
-            _captured = true;
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
         }
 
         public void Apply()
         {
-            Capture();
-            var tint = Tints[Mathf.Clamp(_index, 0, Tints.Length - 1)];
-            for (int i = 0; i < _renders.Length; i++)
-            {
-                var r = _renders[i];
-                if (r == null) continue;
-                var mats = r.materials;   // 实例化，避免污染共享材质
-                bool changed = false;
-                for (int m = 0; m < mats.Length; m++)
-                {
-                    var mat = mats[m];
-                    if (mat == null || !mat.HasProperty("_Color")) continue;
-                    string lower = mat.name.ToLowerInvariant();
-                    if (lower.Contains("skin") || lower.Contains("hair") || lower.Contains("weapon")) continue;
-                    if (lower.Contains("blade") || lower.Contains("sword")) continue;
-                    mat.color = Color.Lerp(_origColors[i], tint, 0.5f);
-                    changed = true;
-                }
-                if (changed) r.materials = mats;
-            }
+            if (_ringMat == null) return;
+            var c = Colors[Mathf.Clamp(_index, 0, Colors.Length - 1)];
+            _ringMat.color = c;
         }
     }
 }

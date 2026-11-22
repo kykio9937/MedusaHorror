@@ -57,6 +57,9 @@ namespace MedusaHorror.Core
                 || scene.name == SubwayScene || scene.name == NeonStreetScene || scene.name == AlienGateScene)
                 GameFlow.Ensure();
 
+            // 角色补光：UnityChan 卡通 shader 只吃平行光，没有平行光的场景角色会渲染成黑剪影
+            EnsureCharacterLight();
+
             // 每次进入关卡都从「未拿钥匙、Boss 未死」开始，避免基地往返后门禁残留
             MedusaHorror.Gameplay.ExitPortal.ResetStaticState();
 
@@ -122,6 +125,27 @@ namespace MedusaHorror.Core
                 p.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
                 p.RenderProbe();
             }
+        }
+
+        // ---------------- 角色补光 ----------------
+
+        /// <summary>场景里没有平行光时补一盏弱平行光，否则角色会变成黑剪影。</summary>
+        static void EnsureCharacterLight()
+        {
+            var lights = Object.FindObjectsOfType<Light>(true);
+            for (int i = 0; i < lights.Length; i++)
+            {
+                if (lights[i] == null || !lights[i].enabled) continue;
+                if (lights[i].type == LightType.Directional) return;
+            }
+
+            var go = new GameObject("P0_CharacterFill");
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Directional;
+            l.color = new Color(0.88f, 0.92f, 1f);
+            l.intensity = 0.5f;
+            l.shadows = LightShadows.None;
+            go.transform.rotation = Quaternion.Euler(52f, -28f, 0f);
         }
 
         // ---------------- NPC 外观差异化 ----------------
