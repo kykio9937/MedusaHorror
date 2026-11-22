@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -139,6 +139,13 @@ namespace MedusaHorror.Core
 
             Font font = UI.CjkFont.Get();
 
+            // 赛博关卡用青色霓虹，恐怖关卡保留暗红基调
+            bool neon = sceneName == "W2_Wasteland" || sceneName == "W3_Subway"
+                        || sceneName == "W4_NeonStreet" || sceneName == "W5_AlienGate";
+            Color accent = neon ? new Color(0.32f, 0.92f, 1f, 1f) : new Color(0.72f, 0.14f, 0.13f, 1f);
+            Color edgeLine = neon ? new Color(0.10f, 0.55f, 0.75f, 0.85f) : new Color(0.45f, 0.05f, 0.06f, 0.75f);
+            Color titleColor = neon ? new Color(0.80f, 0.96f, 1f) : new Color(0.88f, 0.86f, 0.82f);
+
             var bg = Rect("Bg", canvasGo.transform);
             Stretch(bg);
             var bgImg = bg.gameObject.AddComponent<Image>();
@@ -152,7 +159,7 @@ namespace MedusaHorror.Core
             topLine.pivot = new Vector2(0.5f, 1f);
             topLine.offsetMin = new Vector2(0f, -2f);
             topLine.offsetMax = Vector2.zero;
-            topLine.gameObject.AddComponent<Image>().color = new Color(0.45f, 0.05f, 0.06f, 0.75f);
+            topLine.gameObject.AddComponent<Image>().color = edgeLine;
 
             var botLine = Rect("BotLine", canvasGo.transform);
             botLine.anchorMin = new Vector2(0f, 0f);
@@ -160,9 +167,9 @@ namespace MedusaHorror.Core
             botLine.pivot = new Vector2(0.5f, 0f);
             botLine.offsetMin = Vector2.zero;
             botLine.offsetMax = new Vector2(0f, 2f);
-            botLine.gameObject.AddComponent<Image>().color = new Color(0.45f, 0.05f, 0.06f, 0.75f);
+            botLine.gameObject.AddComponent<Image>().color = edgeLine;
 
-            _sceneText = TextRect("SceneName", canvasGo.transform, font, 40, new Color(0.88f, 0.86f, 0.82f));
+            _sceneText = TextRect("SceneName", canvasGo.transform, font, 40, titleColor);
             var srt = _sceneText.rectTransform;
             srt.anchorMin = new Vector2(0.5f, 0.5f);
             srt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -186,10 +193,12 @@ namespace MedusaHorror.Core
             fill.offsetMin = Vector2.zero;
             fill.offsetMax = Vector2.zero;
             _barFill = fill.gameObject.AddComponent<Image>();
-            _barFill.color = new Color(0.72f, 0.14f, 0.13f, 1f);
+            _barFill.color = accent;
             _barFill.type = Image.Type.Filled;
             _barFill.fillMethod = Image.FillMethod.Horizontal;
             _barFill.fillAmount = 0f;
+
+            if (neon) UI.UiSkin.Apply(canvasGo.GetComponent<RectTransform>());
 
             _pctText = TextRect("Pct", canvasGo.transform, font, 20, new Color(0.62f, 0.60f, 0.58f));
             var prt = _pctText.rectTransform;

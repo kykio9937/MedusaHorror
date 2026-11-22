@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -67,6 +67,9 @@ namespace MedusaHorror.Player
 
         /// <summary>一次性切武器脉冲：-1 无效，0 切剑，1 切枪（编辑器诊断命令用，读取后清零）。</summary>
         public static int debugSwitchPulse = -1;
+
+        /// <summary>UI 面板打开时置 true：本帧所有游戏输入清零，避免面板后面角色继续跑动。</summary>
+        public static bool blocked;
 
         /// <summary>键盘与鼠标设备是否就绪</summary>
         public bool DevicesReady { get; private set; }
@@ -145,6 +148,13 @@ namespace MedusaHorror.Player
                 }
             }
 #endif
+            }
+
+            if (blocked)
+            {
+                move = Vector2.zero;
+                look = Vector2.zero;
+                run = jump = interact = fire = reload = w1 = w2 = swap = false;
             }
 
             if (move.sqrMagnitude > 1f) move.Normalize();

@@ -79,6 +79,11 @@ namespace MedusaHorror.Core
                 }
             }
 
+            // 星际传送门实体门框（Resources 里的 Teleport 模型，纯表现层）
+            var portals = Object.FindObjectsOfType<ExitPortal>(true);
+            for (int i = 0; i < portals.Length; i++)
+                if (portals[i] != null) PortalFrame.Ensure(portals[i]);
+
             // 小地图 + 传送门导航罗盘（W1 医院继续用专用 MinimapRig，这里自动跳过）
             LevelMinimap.Ensure(scene.name);
             PortalCompass.Ensure();

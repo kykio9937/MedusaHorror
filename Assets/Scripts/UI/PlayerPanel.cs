@@ -1,18 +1,41 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using MedusaHorror.Core;
+using MedusaHorror.Gameplay;
 using MedusaHorror.Player;
 
 namespace MedusaHorror.UI
 {
     /// <summary>
     /// 玩家面板（Tab）：属性 / 装备 / 背包 / 帮助 四页。
-    /// 数据全部读存档与运行时组件，不额外维护副本。
+    /// 装备页展示全局装备，不依赖当前场景是否存在武器实例；背包页可按数字键使用消耗品。
     /// </summary>
     public class PlayerPanel : MonoBehaviour
     {
         static PlayerPanel _instance;
+
+        // 武器标准数值：场景里没有武器实例时用它做基准，保证装备页在任何关卡都有内容
+        const float BaseMeleeDamage = 55f;
+        const float BaseMeleeRange = 2.2f;
+        const float BaseMeleeInterval = 0.55f;
+        const int BaseMeleeTargets = 4;
+        const float BaseGunDamage = 34f;
+        const float BaseGunRange = 70f;
+        const float BaseGunReload = 1.55f;
+        const int BaseGunMag = 12;
+        const int BaseGunReserve = 240;
+
+        static readonly Dictionary<string, string[]> PurchaseInfo = new Dictionary<string, string[]>
+        {
+            { "w_ed1",    new[] { "刃口强化 I",   "近战/射击伤害 +10%" } },
+            { "w_ed2",    new[] { "刃口强化 II",  "近战/射击伤害 再 +10%" } },
+            { "w_grip",   new[] { "轻量化握柄",   "移动速度 +8%" } },
+            { "c_jump",   new[] { "神经反射插件", "解锁空中二段跳" } },
+            { "c_skin",   new[] { "石英表皮",     "石化抗性 +10%" } },
+            { "c_muscle", new[] { "肌纤维强化",   "移动速度 +8%" } },
+        };
 
         int _page;
         bool _open;
@@ -56,12 +79,17 @@ namespace MedusaHorror.UI
             if (!_open) return;
 
             if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
-            for (int i = 0; i < PageNames.Length; i++)
+
+            if (Input.GetKeyDown(KeyCode.Q)) { _page = (_page + PageNames.Length - 1) % PageNames.Length; Refresh(); return; }
+            if (Input.GetKeyDown(KeyCode.E)) { _page = (_page + 1) % PageNames.Length; Refresh(); return; }
+
+            // 背包页：数字键使用对应物品
+            if (_page == 2)
             {
-                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i)))
+                for (int i = 0; i < 9; i++)
                 {
-                    _page = i;
-                    Refresh();
+                    if (!Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
+                    UseItem(i);
                     return;
                 }
             }
@@ -71,6 +99,7 @@ namespace MedusaHorror.UI
         {
             if (page >= 0) _page = Mathf.Clamp(page, 0, PageNames.Length - 1);
             _open = true;
+            InputReader.blocked = true;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             Refresh();
@@ -81,9 +110,49 @@ namespace MedusaHorror.UI
         {
             if (!_open) return;
             _open = false;
+            InputReader.blocked = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+        }
+
+        /// <summary>使用背包第 index 件物品。</summary>
+        public bool UseItem(int index)
+        {
+            var list = Inventory.Items;
+            if (index < 0 || index >= list.Count)
+            {
+                LootToast.Show("这一格是空的。");
+                return false;
+            }
+
+            var it = list[index];
+            if (it.id == "quartz")
+            {
+                var pz = FindObjectOfType<PlayerPetrify>();
+                if (pz == null) { LootToast.Show("现在用不上。"); return false; }
+                if (pz.value <= 0.5f) { LootToast.Show("身上还没有石化痕迹，先留着。"); return false; }
+
+                float before = pz.value;
+                Inventory.Remove(it.id, 1);
+                pz.ReduceValue(pz.maxValue * 0.15f);
+                LootToast.Show("用掉一罐石英粉 · 石化 " + Mathf.RoundToInt(before) + " → " + Mathf.RoundToInt(pz.value));
+                var audio = AudioDirector.Instance;
+                if (audio != null) audio.PlayAt(SfxId.Pickup, transform.position, 0.8f, 1.05f);
+                Refresh();
+                return true;
+            }
+
+            if (it.kind == "消耗")
+            {
+                Inventory.Remove(it.id, 1);
+                LootToast.Show("用掉了「" + it.name + "」");
+                Refresh();
+                return true;
+            }
+
+            LootToast.Show("「" + it.name + "」不能直接使用。");
+            return false;
         }
 
         // ---------------------------------------------------------------- 内容
@@ -93,15 +162,20 @@ namespace MedusaHorror.UI
             if (_tabText != null)
             {
                 var tb = new StringBuilder();
+                tb.Append("◀ Q     ");
                 for (int i = 0; i < PageNames.Length; i++)
                 {
-                    if (i > 0) tb.Append("   ");
-                    tb.Append(i == _page ? "【" + (i + 1) + " " + PageNames[i] + "】" : " " + (i + 1) + " " + PageNames[i] + " ");
+                    if (i > 0) tb.Append("   ·   ");
+                    tb.Append(i == _page ? "【" + PageNames[i] + "】" : PageNames[i]);
                 }
+                tb.Append("     E ▶");
                 _tabText.text = tb.ToString();
             }
             if (_body != null) _body.text = BuildPage(_page);
-            if (_hint != null) _hint.text = "1-4 切换页签 · Tab / Esc 关闭";
+            if (_hint != null)
+                _hint.text = _page == 2
+                    ? "数字键 1-9 使用物品 · Q / E 切换页签 · Tab / Esc 关闭"
+                    : "Q / E 切换页签 · Tab / Esc 关闭";
         }
 
         string BuildPage(int page)
@@ -161,43 +235,60 @@ namespace MedusaHorror.UI
         string BuildEquipment()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("装备");
-            sb.AppendLine();
-
-            var loadout = FindObjectOfType<WeaponLoadout>();
-            string cur = loadout != null ? (loadout.Current == WeaponKind.Sword ? "石刃（近战）" : "旧式手枪") : "未知";
-            sb.AppendLine("当前手持：" + cur);
-            sb.AppendLine();
-
             float dmgMul = PlayerStats.DamageMultiplier;
 
+            var loadout = FindObjectOfType<WeaponLoadout>(true);
+            string cur = loadout == null ? "石刃（近战）" : (loadout.Current == WeaponKind.Sword ? "石刃（近战）" : "旧式手枪");
+            sb.AppendLine("装备        当前手持：" + cur);
+            sb.AppendLine();
+
+            // 有实例就用实时数值，没有就用标准值，保证任何场景都能看到完整装备
             var melee = FindObjectOfType<MeleeWeapon>(true);
-            if (melee != null)
-            {
-                int actual = Mathf.RoundToInt(melee.damage * dmgMul);
-                sb.AppendLine("石刃");
-                sb.AppendLine("  基础伤害 " + melee.damage.ToString("F0") + "  →  实际 " + actual);
-                sb.AppendLine("  攻击距离 " + melee.attackRange.ToString("F1") + " m · 挥砍 " + melee.attackInterval.ToString("F2") + " s");
-                sb.AppendLine("  单次最多命中 " + melee.maxTargets + " 个目标");
-                sb.AppendLine();
-            }
+            float meleeDmg = melee != null ? melee.damage : BaseMeleeDamage;
+            float meleeRange = melee != null ? melee.attackRange : BaseMeleeRange;
+            float meleeInterval = melee != null ? melee.attackInterval : BaseMeleeInterval;
+            int meleeTargets = melee != null ? melee.maxTargets : BaseMeleeTargets;
+
+            sb.AppendLine("近战 · 石刃");
+            sb.AppendLine("  伤害 " + meleeDmg.ToString("F0") + "  →  实际 " + Mathf.RoundToInt(meleeDmg * dmgMul));
+            sb.AppendLine("  攻击距离 " + meleeRange.ToString("F1") + " m · 挥砍 " + meleeInterval.ToString("F2") + " s · 最多命中 " + meleeTargets);
+            sb.AppendLine();
 
             var gun = FindObjectOfType<PlayerWeapon>(true);
-            if (gun != null)
+            float gunDmg = gun != null ? gun.damage : BaseGunDamage;
+            float gunRange = gun != null ? gun.range : BaseGunRange;
+            float gunReload = gun != null ? gun.reloadTime : BaseGunReload;
+            int gunMag = gun != null ? gun.MagazineSize : BaseGunMag;
+            int gunReserve = gun != null ? gun.ReserveAmmo : BaseGunReserve;
+
+            sb.AppendLine("远程 · 旧式手枪");
+            sb.AppendLine("  伤害 " + gunDmg.ToString("F0") + "  →  实际 " + Mathf.RoundToInt(gunDmg * dmgMul));
+            sb.AppendLine("  弹匣 " + gunMag + " · 备弹 " + gunReserve + " · 射程 " + gunRange.ToString("F0") + " m · 换弹 " + gunReload.ToString("F2") + " s");
+            sb.AppendLine();
+
+            var owned = SaveSystem.Data.shopPurchases;
+            sb.AppendLine("已装强化 / 义体（" + owned.Count + " 件）");
+            if (owned.Count == 0)
             {
-                int actual = Mathf.RoundToInt(gun.damage * dmgMul);
-                sb.AppendLine("旧式手枪");
-                sb.AppendLine("  基础伤害 " + gun.damage.ToString("F0") + "  →  实际 " + actual);
-                sb.AppendLine("  弹匣 " + gun.AmmoInMagazine + " / " + gun.MagazineSize + " · 备弹 " + gun.ReserveAmmo);
-                sb.AppendLine("  射程 " + gun.range.ToString("F0") + " m · 换弹 " + gun.reloadTime.ToString("F2") + " s");
-                sb.AppendLine();
+                sb.AppendLine("  还没有装任何强化，去霓虹街区的武器店和义体门诊看看。");
             }
-
-            if (melee == null && gun == null)
-                sb.AppendLine("当前场景没有可用武器。");
-
-            sb.AppendLine("—— 加成来源 ——");
-            sb.AppendLine("  伤害 +" + Mathf.RoundToInt(Mathf.Clamp(SaveSystem.Data.damageBonus, 0f, 0.8f) * 100f) + "%  ·  来自商店强化与任务奖励");
+            else
+            {
+                for (int i = 0; i < owned.Count; i++)
+                {
+                    string[] info;
+                    if (PurchaseInfo.TryGetValue(owned[i], out info))
+                        sb.AppendLine("  " + info[0] + "　—　" + info[1]);
+                    else
+                        sb.AppendLine("  " + owned[i]);
+                }
+            }
+            sb.AppendLine();
+            sb.AppendLine("—— 加成合计 ——");
+            sb.AppendLine("  伤害 +" + Mathf.RoundToInt(Mathf.Clamp(SaveSystem.Data.damageBonus, 0f, 0.8f) * 100f) + "%"
+                        + " · 移速 +" + Mathf.RoundToInt(Mathf.Clamp(SaveSystem.Data.speedBonus, 0f, 0.5f) * 100f) + "%"
+                        + " · 石化抗性 " + Mathf.RoundToInt(Mathf.Clamp(SaveSystem.Data.petrifyResist, 0f, 0.6f) * 100f) + "%"
+                        + " · 二段跳 " + (SaveSystem.Data.doubleJump ? "已解锁" : "未解锁"));
             return sb.ToString();
         }
 
@@ -217,9 +308,11 @@ namespace MedusaHorror.UI
             for (int i = 0; i < list.Count; i++)
             {
                 var it = list[i];
-                sb.AppendLine("[" + it.kind + "] " + it.name + " ×" + it.count);
-                if (!string.IsNullOrEmpty(it.desc)) sb.AppendLine("    " + it.desc);
+                sb.AppendLine("[" + (i + 1) + "] [" + it.kind + "] " + it.name + " ×" + it.count);
+                if (!string.IsNullOrEmpty(it.desc)) sb.AppendLine("        " + it.desc);
             }
+            sb.AppendLine();
+            sb.AppendLine("消耗品按对应数字键使用。");
             return sb.ToString();
         }
 
@@ -236,10 +329,11 @@ namespace MedusaHorror.UI
             sb.AppendLine("R            换弹");
             sb.AppendLine("1 / 2        切换武器");
             sb.AppendLine("E            交互（拾取、对话、传送门、商店、快速旅行）");
-            sb.AppendLine("Tab          本面板");
+            sb.AppendLine("Tab          本面板（打开时角色停止操作）");
+            sb.AppendLine("Q / E        面板内切换页签");
             sb.AppendLine("Esc          关闭面板 / 打开游戏菜单");
             sb.AppendLine();
-            sb.AppendLine("小提示：石化满了就完了，被盯住时先跑出视线。");
+            sb.AppendLine("小提示：石化满了就完了，被盯住时先跑出视线；身上带着石英粉能救一次。");
             return sb.ToString();
         }
 
@@ -273,18 +367,19 @@ namespace MedusaHorror.UI
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1500f, 70f),
                 new Color(1f, 0.85f, 0.35f));
 
-            _body = MakeText(go.transform, font, 32, TextAnchor.UpperLeft,
+            _body = MakeText(go.transform, font, 28, TextAnchor.UpperLeft,
                 new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
                 new Color(0.92f, 0.96f, 1f));
             var brt2 = _body.rectTransform;
-            brt2.offsetMin = new Vector2(260f, 130f);
-            brt2.offsetMax = new Vector2(-260f, -140f);
-            _body.lineSpacing = 1.32f;
+            brt2.offsetMin = new Vector2(240f, 108f);
+            brt2.offsetMax = new Vector2(-240f, -132f);
+            _body.lineSpacing = 1.22f;
 
             _hint = MakeText(go.transform, font, 26, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(1200f, 50f),
                 new Color(0.62f, 0.70f, 0.80f));
 
+            UiSkin.Apply(go.GetComponent<RectTransform>());
             go.SetActive(false);
         }
 

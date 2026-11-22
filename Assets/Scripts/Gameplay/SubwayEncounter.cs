@@ -229,6 +229,7 @@ namespace MedusaHorror.Gameplay
             _body.horizontalOverflow = HorizontalWrapMode.Wrap;
             _body.verticalOverflow = VerticalWrapMode.Overflow;
 
+            MedusaHorror.UI.UiSkin.Apply(go.GetComponent<RectTransform>());
             go.SetActive(false);
         }
     }

@@ -98,6 +98,14 @@ namespace MedusaHorror.Gameplay
             UpdateHud(0f);
         }
 
+        /// <summary>直接削减石化值（消耗品用，比如石英粉）。</summary>
+        public void ReduceValue(float amount)
+        {
+            if (amount <= 0f) return;
+            value = Mathf.Max(0f, value - amount);
+            lastRate = 0f;
+        }
+
         public void ApplyGaze(float weightedRate, float dt)
         {
             if (petrified) return;

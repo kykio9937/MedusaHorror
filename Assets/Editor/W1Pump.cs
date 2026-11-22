@@ -1594,12 +1594,74 @@ public static class W1Pump
             for (int i = 0; i < ps.Length; i++) sb5.Append(" " + ps[i].name + "=" + ps[i].particleCount + "/" + ps[i].isPlaying);
             return sb5.ToString();
         }
+        if (op == "HOTSTATE")
+        {
+            return "[HOTSTATE] " + MedusaHorror.Core.HotUpdate.Diag();
+        }
+        if (op == "HOTCHECK")
+        {
+            string url = parts.Length > 1 ? parts[1] : null;
+            MedusaHorror.Core.HotUpdate.Check(url);
+            return "[HOTCHECK] " + MedusaHorror.Core.HotUpdate.Diag();
+        }
+        if (op == "PORTALPOS")
+        {
+            var portals = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.ExitPortal>(true);
+            if (portals.Length == 0) return "[PORTALPOS] none";
+            var p0 = portals[0];
+            return "[PORTALPOS] " + p0.gameObject.name + " " + p0.transform.position.ToString("F2") +
+                   " fwd=" + p0.transform.forward.ToString("F2") + " count=" + portals.Length;
+        }
+        if (op == "PORTALSTAND")
+        {
+            var portals = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.ExitPortal>(true);
+            var pc = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(true);
+            if (portals.Length == 0 || pc == null) return "[PORTALSTAND] missing";
+            var p0 = portals[0];
+            float dist = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : 6f;
+            Vector3 pos = p0.transform.position - p0.transform.forward * dist;
+            pos.y = p0.transform.position.y + 0.1f;
+            var cc = pc.GetComponent<CharacterController>();
+            if (cc != null) { cc.enabled = false; pc.transform.position = pos; cc.enabled = true; }
+            else pc.transform.position = pos;
+            Vector3 d = p0.transform.position - pos; d.y = 0f;
+            if (d.sqrMagnitude > 0.01f) pc.SetYaw(Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg);
+            return "[PORTALSTAND] at=" + pos.ToString("F2") + " portal=" + p0.transform.position.ToString("F2");
+        }
+        if (op == "PORTALFRAME")
+        {
+            var portals = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.ExitPortal>(true);
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < portals.Length; i++)
+            {
+                var pf = MedusaHorror.Gameplay.PortalFrame.Ensure(portals[i]);
+                sb.Append("[").Append(portals[i].gameObject.name).Append(" built=").Append(pf.Built)
+                  .Append(" ").Append(pf.Diag).Append("] ");
+            }
+            if (portals.Length == 0) sb.Append("no-portal");
+            return "[PORTALFRAME] " + sb.ToString();
+        }
         if (op == "PANELOPEN")
         {
             var pp = MedusaHorror.UI.PlayerPanel.Ensure();
             int pg = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
             pp.Open(pg);
             return "[PANELOPEN] page=" + pg + " open=" + pp.IsOpen;
+        }
+        if (op == "USEITEM")
+        {
+            var pp = MedusaHorror.UI.PlayerPanel.Ensure();
+            int idx = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            bool used = pp.UseItem(idx);
+            var pz = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.PlayerPetrify>(true);
+            string pzS = pz != null ? ("petrify=" + pz.value.ToString("F1")) : "petrify=none";
+            return "[USEITEM] idx=" + idx + " used=" + used + " items=" + MedusaHorror.Core.Inventory.TotalCount + " " + pzS;
+        }
+        if (op == "PANELSTATE")
+        {
+            var pp = MedusaHorror.UI.PlayerPanel.Ensure();
+            return "[PANELSTATE] open=" + pp.IsOpen + " page=" + pp.Page +
+                   " blocked=" + MedusaHorror.Player.InputReader.blocked;
         }
         if (op == "PANELCLOSE")
         {
