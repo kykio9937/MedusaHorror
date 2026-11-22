@@ -31,6 +31,7 @@ namespace MedusaHorror.EditorTools
             var sb = new StringBuilder("[W5] 外星星门\n");
 
             BuildGround(root, sb);
+            BuildPaths(root, sb);
             int flora = BuildFlora(root, sb);
             int rocks = BuildRocks(root, sb);
             BuildMonoliths(root, sb);
@@ -87,6 +88,51 @@ namespace MedusaHorror.EditorTools
             sb.AppendLine("[W5] 地面铺设完成");
         }
 
+        // ------------------------------------------------------------------ 道路
+        static void BuildPaths(Transform root, StringBuilder sb)
+        {
+            var mat = LevelKit.LoadMat(MAT + "monolith.mat");
+            if (mat == null) mat = LevelKit.LoadMat(MAT + "debrisStone.mat");
+            mat = LevelKit.MakeTinted("W5_Path", mat, new Color(0.66f, 0.60f, 0.76f));
+
+            float len = Mathf.Abs(GATE_Z - START_Z);
+
+            // 主路：起点落点台 → 星门石台
+            LevelKit.Slab("MainPath", root, new Vector3(0f, 0.02f, (START_Z + GATE_Z) * 0.5f),
+                new Vector3(7f, 0.06f, len), mat);
+
+            // 两侧发光路缘，夜里也能看清方向
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var edge = LevelKit.Slab("PathEdge" + side, root,
+                    new Vector3(side * 3.6f, 0.06f, (START_Z + GATE_Z) * 0.5f),
+                    new Vector3(0.22f, 0.10f, len), null, false);
+                var mr = edge.GetComponent<MeshRenderer>();
+                var em = new Material(Shader.Find("Standard"));
+                em.color = new Color(0.45f, 0.85f, 1f);
+                em.EnableKeyword("_EMISSION");
+                em.SetColor("_EmissionColor", new Color(0.30f, 0.75f, 1f) * 1.6f);
+                mr.sharedMaterial = em;
+            }
+
+            // 支路：主路中段向右绕一圈，再汇回主路，给玩家第二条走法
+            float[] xs = { 0f, 9f, 18f, 18f, 9f, 0f };
+            float[] zs = { -12f, -12f, -6f, 18f, 24f, 24f };
+            for (int i = 0; i < xs.Length - 1; i++)
+            {
+                Vector3 a = new Vector3(xs[i], 0.03f, zs[i]);
+                Vector3 b = new Vector3(xs[i + 1], 0.03f, zs[i + 1]);
+                Vector3 mid = (a + b) * 0.5f;
+                float segLen = Vector3.Distance(a, b);
+                float ang = Mathf.Atan2(b.x - a.x, b.z - a.z) * Mathf.Rad2Deg;
+                var seg = LevelKit.Slab("SidePath" + i, root, mid,
+                    new Vector3(5f, 0.05f, segLen + 1.2f), mat, false);
+                seg.transform.rotation = Quaternion.Euler(0f, ang, 0f);
+            }
+
+            sb.AppendLine("[W5] 主路 + 支路铺设完成");
+        }
+
         // ------------------------------------------------------------------ 植被
         static int BuildFlora(Transform root, StringBuilder sb)
         {
@@ -107,6 +153,7 @@ namespace MedusaHorror.EditorTools
                 // 主路径与星门台地留空
                 if (Mathf.Abs(x) < 13f && z > START_Z - 12f && z < GATE_Z + 22f) continue;
                 if (Mathf.Abs(x) < 22f && Mathf.Abs(z - GATE_Z) < 20f) continue;
+                if (x > -4f && x < 22f && z > -16f && z < 28f) continue;   // 支路走廊留空
                 string p = flora[rnd.Next(0, flora.Length)];
                 if (LevelKit.Place(PF + p, new Vector3(x, 0f, z), (float)(rnd.NextDouble() * 360.0), root) != null) n++;
             }
@@ -130,6 +177,7 @@ namespace MedusaHorror.EditorTools
                 float x = Mathf.Cos(a) * r;
                 float z = Mathf.Sin(a) * r;
                 if (Mathf.Abs(x) < 13f && z > START_Z - 12f && z < GATE_Z + 22f) continue;
+                if (x > -4f && x < 22f && z > -16f && z < 28f) continue;   // 支路走廊留空
                 string p = rocks[rnd.Next(0, rocks.Length)];
                 var go = LevelKit.Place(PF + p, new Vector3(x, 0f, z), (float)(rnd.NextDouble() * 360.0), root);
                 if (go == null) continue;
@@ -296,6 +344,7 @@ namespace MedusaHorror.EditorTools
             portal.door = null;
             portal.fxRoot = null;
             portal.requireKey = false;
+            portal.requireActivation = true;
             portal.nextSceneOverride = "";
             portal.halfWidth = 2.3f;
             portal.halfDepth = 1.4f;

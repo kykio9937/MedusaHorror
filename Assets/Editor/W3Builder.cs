@@ -35,14 +35,17 @@ namespace MedusaHorror.EditorTools
             int floor = BuildFloor(root, mats, sb);
             int walls = BuildWalls(root, mats, sb);
             BuildCeiling(root, mats, sb);
+            BuildSideCorridor(root, mats, sb);
             BuildPillarsAndProps(root, mats, sb);
             BuildTunnelEnds(root, mats, sb);
             BuildLighting(root, sb);
-            var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 6f), 0f, sb, "W3");
+            // 出生点避开南端隧道口铁轨（铁轨顶面 0.64m，站上去会把人托起来）
+            var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 10f), 0f, sb, "W3");
             LevelKit.BuildCamera(player, "CM_W3_ThirdPerson", sb, "W3");
+            // 地铁出口：需要先点亮，且要买票（200 信用点）才能乘车去霓虹街区
             LevelKit.BuildExitPortal(root, "W3_ExitPortal", new Vector3(0f, 0f, Z1 - 5f), 180f,
                 new Color(0.30f, 0.95f, 0.85f, 0.45f), new Color(0.35f, 1f, 0.9f),
-                mats.Metal, "", sb, "W3");
+                mats.Metal, "", sb, "W3", true, 200);
             LevelKit.BuildIntro(root, "地下的灯还在闪。顺着站台往北走，尽头有向上的出口。", 1.6f);
 
             sb.AppendLine("[W3] 地砖=" + floor + " 墙段=" + walls);
@@ -109,13 +112,19 @@ namespace MedusaHorror.EditorTools
                 float x = side * (HALF_W + 0.3f);
                 for (float z = Z0; z < Z1; z += 4f)
                 {
+                    float cz = z + 2f;
+                    // 左侧留两个 8m 宽门洞（z≈-14 / z≈+10），通向平行侧廊，形成可绕行的回路
+                    // 门洞边界正好落在立柱之间（立柱在 -26,-18,-10,-2,6,14,...），中间不挡路
+                    if (side < 0 && (Mathf.Abs(cz + 16f) < 0.5f || Mathf.Abs(cz + 12f) < 0.5f
+                                  || Mathf.Abs(cz - 8f) < 0.5f || Mathf.Abs(cz - 12f) < 0.5f)) continue;
                     var w = LevelKit.Place(SUB + "Subway_wall_Large1_Half_B.prefab",
-                        new Vector3(x, 0f, z + 2f), 90f, root);
+                        new Vector3(x, 0f, cz), 90f, root);
                     if (w != null) n++;
                 }
                 // 腰线灯带
                 for (float z = Z0 + 2f; z < Z1; z += 8f)
                 {
+                    if (side < 0 && (Mathf.Abs(z + 14f) < 3f || Mathf.Abs(z - 10f) < 3f)) continue;
                     var p = LevelKit.Place(SUB + "Subway_wall_panel1.prefab",
                         new Vector3(side * (HALF_W - 0.05f), 1.1f, z), 90f, root, false);
                     if (p != null) p.transform.SetParent(root, true);
@@ -189,6 +198,48 @@ namespace MedusaHorror.EditorTools
                 new Vector3(3.6f, 4.4f, 0.6f), m.Wall);
 
             sb.AppendLine("[W3] 隧道端头完成");
+        }
+
+        // ------------------------------------------------------------------ 平行侧廊（回路）
+        static void BuildSideCorridor(Transform root, Mats m, StringBuilder sb)
+        {
+            const float CX = -9.45f;   // 侧廊中心 X
+            const float W = 9.5f;      // 侧廊宽
+            const float CZ0 = -18f, CZ1 = 18f;
+            float len = CZ1 - CZ0;
+
+            LevelKit.Slab("SideFloor", root, new Vector3(CX, -0.2f, (CZ0 + CZ1) * 0.5f),
+                new Vector3(W, 0.4f, len), m.Floor);
+            LevelKit.Slab("SideCeil", root, new Vector3(CX, CEIL_Y + 0.15f, (CZ0 + CZ1) * 0.5f),
+                new Vector3(W, 0.3f, len), m.Ceil);
+            LevelKit.Slab("SideOuterWall", root, new Vector3(CX - W * 0.5f - 0.2f, 2.2f, 0f),
+                new Vector3(0.4f, 4.4f, len + 0.8f), m.Wall);
+            LevelKit.Slab("SideEndS", root, new Vector3(CX, 2.2f, CZ0 - 0.2f),
+                new Vector3(W, 4.4f, 0.4f), m.Wall);
+            LevelKit.Slab("SideEndN", root, new Vector3(CX, 2.2f, CZ1 + 0.2f),
+                new Vector3(W, 4.4f, 0.4f), m.Wall);
+
+            for (float z = CZ0 + 5f; z < CZ1 - 2f; z += 8f)
+            {
+                LevelKit.Place(SUB + "Subway_Lamp1.prefab", new Vector3(CX, CEIL_Y - 0.35f, z), 90f, root, false);
+                LevelKit.AddPointLight(root, "SideLamp_" + Mathf.RoundToInt(z),
+                    new Vector3(CX, CEIL_Y - 0.6f, z), new Color(0.68f, 0.96f, 0.90f), 3.6f, 14f);
+            }
+            // 侧廊中央补一盏大范围顶灯，避免两端之间出现死黑
+            LevelKit.AddPointLight(root, "SideLampMid", new Vector3(CX, CEIL_Y - 0.6f, 0f),
+                new Color(0.70f, 0.96f, 0.92f), 3.2f, 18f);
+
+            var rnd = new System.Random(3141);
+            string[] props = { "Subway_Trash_Bin.prefab", "Subway_Bar1A.prefab", "Subway_Vents1.prefab", "Subway_cables_Box1.prefab" };
+            for (float z = CZ0 + 4f; z < CZ1 - 4f; z += 7f)
+            {
+                if (rnd.NextDouble() > 0.6) continue;
+                string p = props[rnd.Next(0, props.Length)];
+                float x = CX + (float)(rnd.NextDouble() * (W - 2.6f) - (W * 0.5f - 1.3f));
+                LevelKit.Place(SUB + p, new Vector3(x, 0f, z), (float)(rnd.NextDouble() * 360.0), root);
+            }
+
+            sb.AppendLine("[W3] 平行侧廊完成 x=" + CX + " 长=" + len);
         }
 
         // ------------------------------------------------------------------ 灯光

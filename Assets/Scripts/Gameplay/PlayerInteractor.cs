@@ -25,7 +25,7 @@ namespace MedusaHorror.Gameplay
         public const float HintY = 268f;
 
         InputReader input;
-        DoorInteractable target;
+        IInteractable target;
         Text hintText;
         Image hintBg;
         readonly List<Collider> buffer = new List<Collider>(32);
@@ -52,7 +52,8 @@ namespace MedusaHorror.Gameplay
             if (hintBg != null) hintBg.enabled = false;
         }
 
-        void Update()
+        // 放在 LateUpdate：确保 InputReader.Update 已经算完当帧的 InteractPressed
+        void LateUpdate()
         {
             target = FindTarget();
 
@@ -72,20 +73,20 @@ namespace MedusaHorror.Gameplay
                 target.Interact();
         }
 
-        DoorInteractable FindTarget()
+        IInteractable FindTarget()
         {
             Vector3 origin = transform.position + Vector3.up * eyeHeight;
             Collider[] hits = Physics.OverlapSphere(origin, reach, ~0, QueryTriggerInteraction.Collide);
-            DoorInteractable best = null;
+            IInteractable best = null;
             float bestDist = float.MaxValue;
             Vector3 fwd = transform.forward;
             for (int i = 0; i < hits.Length; i++)
             {
                 var c = hits[i];
                 if (c == null) continue;
-                var d = c.GetComponentInParent<DoorInteractable>();
-                if (d == null) continue;
-                Vector3 to = d.transform.position - origin;
+                var d = c.GetComponentInParent<IInteractable>();
+                if (d == null || !d.CanInteract) continue;
+                Vector3 to = ((MonoBehaviour)d).transform.position - origin;
                 to.y = 0f;
                 if (to.sqrMagnitude < 0.0001f) continue;
                 if (Vector3.Dot(fwd, to.normalized) < facingDot) continue;

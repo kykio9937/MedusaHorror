@@ -7,7 +7,7 @@ namespace MedusaHorror.Gameplay
     /// 新增锁定能力：锁住时无法交互，并强制回到关闭姿态（Boss 战区域封锁用）。
     /// </summary>
     [DisallowMultipleComponent]
-    public class DoorInteractable : MonoBehaviour
+    public class DoorInteractable : MonoBehaviour, IInteractable
     {
         [Header("开门参数")]
         public float openAngle = 85f;
@@ -40,6 +40,9 @@ namespace MedusaHorror.Gameplay
                 return isOpen ? openedHint : closedHint;
             }
         }
+
+        /// <summary>锁住的门也允许交互（会播放上锁音效并提示），所以恒为 true。</summary>
+        public bool CanInteract { get { return true; } }
 
         public void Configure(Quaternion closed, Quaternion open)
         {

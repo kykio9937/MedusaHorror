@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
+using MedusaHorror.Core;
 
 namespace MedusaHorror.Gameplay
 {
@@ -12,7 +13,7 @@ namespace MedusaHorror.Gameplay
     /// 3) 与石化致死（GameFlow.Failed）完全无关，也不触发 Won 结算面板。
     /// </summary>
     [DisallowMultipleComponent]
-    public class ExitPortal : MonoBehaviour
+    public class ExitPortal : MonoBehaviour, IInteractable
     {
         [Header("门体")]
         public DoorInteractable door;
@@ -26,6 +27,12 @@ namespace MedusaHorror.Gameplay
         public float leaveDelay = 1.05f;
         [Tooltip("是否需要 Boss 掉落的钥匙才能开门；W2 这类没有 Boss 的关卡可关闭")]
         public bool requireKey = true;
+
+        [Header("解锁方式")]
+        [Tooltip("需要靠近按 E 点亮（幻兽帕鲁式）；点亮状态写入存档")]
+        public bool requireActivation = false;
+        [Tooltip("通过时扣多少信用点（0 = 免费）。余额不足会被拦下")]
+        public int cost = 0;
 
         [Header("门洞判定（本地坐标，单位米）")]
         public float halfWidth = 1.25f;
@@ -45,10 +52,63 @@ namespace MedusaHorror.Gameplay
 
         bool _announced;
         bool _leaving;
+        float _warnAt = -99f;
         Transform _player;
 
         public static bool KeyGranted { get { return s_keyGranted; } }
         public static bool BossDefeated { get { return s_bossDefeated; } }
+
+        /// <summary>传送门存档 id：场景名|对象名。</summary>
+        public string PortalId { get { return SceneManager.GetActiveScene().name + "|" + gameObject.name; } }
+
+        /// <summary>是否已点亮（不要求点亮时恒为 true）。</summary>
+        public bool Activated
+        {
+            get
+            {
+                if (!requireActivation) return true;
+                var list = SaveSystem.Data.activatedPortals;
+                string k = PortalId;
+                for (int i = 0; i < list.Count; i++) if (list[i] == k) return true;
+                return false;
+            }
+        }
+
+        // ---------------- IInteractable ----------------
+
+        public string Hint
+        {
+            get
+            {
+                if (requireActivation && !Activated) return "点亮传送门";
+                if (cost > 0)
+                {
+                    if (!Wallet.CanAfford(cost)) return "票价 " + cost + " · 余额不足（" + Wallet.Coins + "）";
+                    return "传送门已点亮 · 票价 " + cost;
+                }
+                return "传送门已点亮";
+            }
+        }
+
+        /// <summary>只有「未点亮」这一种状态需要按 E。</summary>
+        public bool CanInteract { get { return requireActivation && !Activated; } }
+
+        public void Interact()
+        {
+            if (requireActivation && !Activated) ActivatePortal();
+        }
+
+        void ActivatePortal()
+        {
+            var list = SaveSystem.Data.activatedPortals;
+            string k = PortalId;
+            if (!list.Contains(k)) { list.Add(k); SaveSystem.Save(); }
+            if (fxRoot != null) fxRoot.SetActive(true);
+            LootToast.Show("传送门已点亮 · 走进去即可出发");
+            Debug.Log("[Exit] 传送门点亮 " + k);
+            var audio = AudioDirector.Instance;
+            if (audio != null) audio.PlayAt(SfxId.Pickup, transform.position, 0.9f, 1.1f);
+        }
 
         /// <summary>Boss 死亡时调用：点亮传送门光效（门仍需钥匙才能开）。</summary>
         public static void NotifyBossDefeated()
@@ -62,7 +122,10 @@ namespace MedusaHorror.Gameplay
 
         void ApplyDormant()
         {
-            if (fxRoot != null) fxRoot.SetActive(s_bossDefeated);
+            if (fxRoot == null) return;
+            // Boss 关还要等 Boss 死；其余关卡只看是否点亮
+            bool show = requireKey ? (s_bossDefeated && Activated) : Activated;
+            fxRoot.SetActive(show);
         }
 
         /// <summary>Boss 钥匙拾取时调用。</summary>
@@ -91,9 +154,23 @@ namespace MedusaHorror.Gameplay
         {
             if (_leaving) return;
             SyncLock();
+            if (requireActivation && !Activated) return;
             if (requireKey && !s_keyGranted) return;
             if (door != null && !door.IsOpen) return;
             if (!PlayerInside()) return;
+
+            if (cost > 0 && !Wallet.CanAfford(cost))
+            {
+                if (Time.unscaledTime - _warnAt > 2.5f)
+                {
+                    _warnAt = Time.unscaledTime;
+                    LootToast.Show("票价 " + cost + " 信用点 · 当前只有 " + Wallet.Coins);
+                    var a = AudioDirector.Instance;
+                    if (a != null) a.PlayAt(SfxId.DoorLocked, transform.position, 0.7f, 1f);
+                }
+                return;
+            }
+
             BeginLeave();
         }
 
@@ -143,8 +220,18 @@ namespace MedusaHorror.Gameplay
             _leaving = true;
             string next = ResolveNextScene();
             string label = string.IsNullOrEmpty(next) ? MedusaHorror.Core.GameFlow.MenuScene : next;
-            LootToast.Show("离场 · " + label);
-            Debug.Log("[Exit] 玩家走入传送门，开始离场 → " + label);
+
+            if (cost > 0)
+            {
+                if (!Wallet.Spend(cost)) { _leaving = false; return; }
+                LootToast.Show("购票 -" + cost + " 信用点 · 前往 " + label);
+            }
+            else
+            {
+                LootToast.Show("离场 · " + label);
+            }
+
+            Debug.Log("[Exit] 玩家走入传送门，开始离场 → " + label + (cost > 0 ? "（花费 " + cost + "）" : ""));
             var audio = MedusaHorror.Core.AudioDirector.Instance;
             if (audio != null) audio.PlayAt(MedusaHorror.Core.SfxId.Pickup, transform.position, 0.9f, 0.85f);
             MedusaHorror.Core.GameFlow.LeaveRun(next);

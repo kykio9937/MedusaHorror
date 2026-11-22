@@ -217,15 +217,16 @@ namespace MedusaHorror.EditorTools
             player.transform.position = pos;
             player.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
-            if (player.GetComponent<CharacterController>() == null)
-            {
-                var cc = player.AddComponent<CharacterController>();
-                cc.height = 1.7f;
-                cc.radius = 0.34f;
-                cc.center = new Vector3(0f, 0.85f, 0f);
-                cc.slopeLimit = 50f;
-                cc.stepOffset = 0.35f;
-            }
+            // 碰撞体对齐模型实际包围盒：脚底 = 原点 -0.19，头顶 = 原点 +1.53
+            // 之前沿用 prefab 自带的 CC（center 0.74），脚底比模型低 8cm，角色会陷进地面
+            var cc = player.GetComponent<CharacterController>();
+            if (cc == null) cc = player.AddComponent<CharacterController>();
+            cc.height = 1.72f;
+            cc.radius = 0.34f;
+            cc.center = new Vector3(0f, 0.67f, 0f);
+            cc.skinWidth = 0.03f;
+            cc.slopeLimit = 50f;
+            cc.stepOffset = 0.35f;
             if (player.GetComponent<InputReader>() == null) player.AddComponent<InputReader>();
             if (player.GetComponent<ThirdPersonController>() == null) player.AddComponent<ThirdPersonController>();
             if (player.GetComponent<PlayerInteractor>() == null) player.AddComponent<PlayerInteractor>();
@@ -292,7 +293,8 @@ namespace MedusaHorror.EditorTools
 
         // ------------------------------------------------------------------ 离场门
         public static GameObject BuildExitPortal(Transform root, string name, Vector3 pos, float yaw,
-            Color veilColor, Color lightColor, Material frameMat, string overrideNext, StringBuilder sb, string tag)
+            Color veilColor, Color lightColor, Material frameMat, string overrideNext, StringBuilder sb, string tag,
+            bool activation = false, int cost = 0)
         {
             var exitRoot = new GameObject(name);
             exitRoot.transform.SetParent(root, false);
@@ -354,6 +356,8 @@ namespace MedusaHorror.EditorTools
             portal.door = null;
             portal.fxRoot = fx;
             portal.requireKey = false;
+            portal.requireActivation = activation;
+            portal.cost = cost;
             portal.nextSceneOverride = overrideNext ?? "";
             portal.halfWidth = 1.45f;
             portal.halfDepth = 1.2f;
