@@ -70,6 +70,15 @@ namespace MedusaHorror.Player
             CacheComponents();
         }
 
+        /// <summary>直接设置水平朝向（同时更新目标与当前角度，避免被平滑插值拉回）。</summary>
+        public void SetYaw(float yaw)
+        {
+            _targetYaw = yaw;
+            _currentYaw = yaw;
+            _yawVelocity = 0f;
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        }
+
         void CacheComponents()
         {
             if (_cc == null) _cc = GetComponent<CharacterController>();
@@ -119,9 +128,10 @@ namespace MedusaHorror.Player
             Vector2 moveInput = input.Move;
             bool hasInput = moveInput.sqrMagnitude > 0.01f;
 
-            // 目标速度：有输入时按 Shift 在走/跑之间切换
+            // 目标速度：有输入时按 Shift 在走/跑之间切换；任务奖励的移速加成在这里生效
             float targetSpeed = 0f;
-            if (hasInput) targetSpeed = input.RunHeld ? runSpeed : walkSpeed;
+            if (hasInput)
+                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier;
 
             float rate = _planarSpeed < targetSpeed ? acceleration : deceleration;
             _planarSpeed = Mathf.MoveTowards(_planarSpeed, targetSpeed, rate * Time.deltaTime);

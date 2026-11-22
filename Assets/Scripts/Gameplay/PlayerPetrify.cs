@@ -99,7 +99,9 @@ namespace MedusaHorror.Gameplay
             if (dt > 0.1f) dt = 0.1f;   // 防止掉帧单帧大幅跳变
             lastRate = weightedRate;
             if (weightedRate > 0f) gazeTime += dt;
-            value = Mathf.Min(maxValue, value + weightedRate * dt);
+            // 任务奖励的石化抗性按比例削减累积速度
+            float resistScale = 1f - MedusaHorror.Core.PlayerStats.PetrifyResist;
+            value = Mathf.Min(maxValue, value + weightedRate * dt * resistScale);
             if (value >= maxValue) EnterPetrified();
         }
 

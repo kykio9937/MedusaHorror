@@ -410,7 +410,7 @@ namespace MedusaHorror.Player
             var boss = best.collider.GetComponentInParent<MedusaBoss>();
             if (boss != null)
             {
-                boss.TakeDamage(damage);
+                boss.TakeDamage(damage * MedusaHorror.Core.PlayerStats.DamageMultiplier);
                 return;
             }
 

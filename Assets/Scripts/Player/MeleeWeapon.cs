@@ -234,8 +234,9 @@ namespace MedusaHorror.Player
                 Vector3 point = boss.transform.position + Vector3.up * 1.0f;
                 Vector3 hitPoint = Vector3.Lerp(pivot, point, 0.75f);
 
-                boss.TakeDamage(damage);
-                dealt += damage;
+                float dmg = damage * MedusaHorror.Core.PlayerStats.DamageMultiplier;
+                boss.TakeDamage(dmg);
+                dealt += dmg;
                 hitCount++;
                 TotalHits++;
 

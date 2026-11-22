@@ -19,6 +19,8 @@ namespace MedusaHorror.Gameplay
 
         [Header("道具")]
         public string itemName = "锈蚀钥匙";
+        [Tooltip("击杀 Boss 一并获得的信用点")]
+        public int coinReward = 300;
         public Color glowColor = new Color(1f, 0.82f, 0.35f, 1f);
 
         public bool dropped;
@@ -38,7 +40,12 @@ namespace MedusaHorror.Gameplay
             }
             Vector3 p = away + offset;
             var key = BossKey.Spawn(p, itemName, glowColor, gate);
-            Debug.Log("[Loot] Boss 掉落「" + itemName + "」于 " + p.ToString("F2"));
+            if (coinReward > 0)
+            {
+                MedusaHorror.Core.Wallet.Add(coinReward);
+                LootToast.Show("战利品 · +" + coinReward + " 信用点");
+            }
+            Debug.Log("[Loot] Boss 掉落「" + itemName + "」于 " + p.ToString("F2") + " · 信用点 +" + coinReward);
             return key;
         }
 
