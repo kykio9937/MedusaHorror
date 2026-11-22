@@ -20,6 +20,8 @@ namespace MedusaHorror.Gameplay
         [Header("行驶")]
         public float scrollSpeed = 0.22f;      // 背景贴图每秒滚动比例
         public float shakeAmount = 0.012f;
+        public float rideDuration = 12f;       // 上车后多久到站
+        public string nextScene = "W4_NeonStreet";
 
         [Header("落点")]
         public Vector3 boardPoint = new Vector3(0f, 0.15f, 3f);   // 相对车厢中心
@@ -39,6 +41,8 @@ namespace MedusaHorror.Gameplay
         float _passZ;
         float _time;
         bool _built;
+        float _rideTime;
+        bool _arriving;
 
         static readonly Color HullDark = new Color(0.075f, 0.085f, 0.105f);
         static readonly Color HullMid = new Color(0.145f, 0.165f, 0.205f);
@@ -379,6 +383,8 @@ namespace MedusaHorror.Gameplay
             if (pz == null) return;
             _player = pz.transform;
             Riding = true;
+            _rideTime = 0f;
+            _arriving = false;
             TeleportPlayer(transform.TransformPoint(boardPoint));
             AudioDirector.Instance?.Play(SfxId.DoorOpen, 0.7f, 0.9f);
             UI.StoryBanner.Show("列车启动", "气密门合拢，窗外的霓虹被拉成一道道流光。", 3.2f);
@@ -387,8 +393,18 @@ namespace MedusaHorror.Gameplay
         public void Leave()
         {
             Riding = false;
+            _rideTime = 0f;
+            _arriving = false;
             TeleportPlayer(StationReturn);
             AudioDirector.Instance?.Play(SfxId.DoorClose, 0.7f, 1f);
+        }
+
+        /// <summary>到站：淡出后切到下一关（霓虹街区）。</summary>
+        System.Collections.IEnumerator ArriveRoutine()
+        {
+            UI.StoryBanner.Show("到站", "列车减速，霓虹街区的灯牌在车窗外铺开。", 2.6f);
+            yield return new WaitForSeconds(2.6f);
+            if (Riding) SceneLoader.Load(nextScene, "霓虹街区");
         }
 
         void TeleportPlayer(Vector3 world)
@@ -465,6 +481,17 @@ namespace MedusaHorror.Gameplay
                 _cabin.localPosition = new Vector3(0f, s, 0f);
                 _cabin.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(_time * 5.7f) * 0.25f);
             }
+
+            // 到站判定
+            if (Riding && !_arriving)
+            {
+                _rideTime += Time.deltaTime;
+                if (_rideTime >= rideDuration)
+                {
+                    _arriving = true;
+                    StartCoroutine(ArriveRoutine());
+                }
+            }
         }
     }
 
@@ -472,12 +499,28 @@ namespace MedusaHorror.Gameplay
     public class TrainBoardPoint : MonoBehaviour, IInteractable
     {
         public Vector3 stationReturn;
+        public int fare = 200;
 
-        public string Hint { get { return "列车 · 上车（E）"; } }
-        public bool CanInteract { get { return true; } }
+        public string Hint
+        {
+            get
+            {
+                if (TrainRide.Instance != null && TrainRide.Instance.Riding) return "列车 · 已在车上";
+                if (Wallet.CanAfford(fare)) return "列车 · 上车（" + fare + " 信用点，E）";
+                return "列车 · 信用点不足（需 " + fare + "，现有 " + Wallet.Coins + "）";
+            }
+        }
+
+        public bool CanInteract { get { return TrainRide.Instance == null || !TrainRide.Instance.Riding; } }
 
         public void Interact()
         {
+            if (TrainRide.Instance != null && TrainRide.Instance.Riding) return;
+            if (!Wallet.Spend(fare))
+            {
+                UI.StoryBanner.Show("信用点不足", "乘车去霓虹街区要 " + fare + " 信用点，你只有 " + Wallet.Coins + "。", 2.6f);
+                return;
+            }
             var t = TrainRide.Ensure(stationReturn);
             t.Board();
         }

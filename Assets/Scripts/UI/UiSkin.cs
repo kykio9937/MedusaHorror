@@ -60,6 +60,10 @@ namespace MedusaHorror.UI
         {
             if (_frame != null) return _frame;
 
+            // 优先用素材包的面板框，取不到再退回程序化霓虹描边
+            _frame = UiAtlas.Frame;
+            if (_frame != null) return _frame;
+
             const int S = 96;
             const int B = 22;
             const int Line = 3;

@@ -46,10 +46,8 @@ namespace MedusaHorror.EditorTools
             var player = LevelKit.BuildPlayer(root, new Vector3(0f, 0.25f, Z0 + 10f), 0f, sb, "W3");
             LevelKit.BuildCamera(player, "CM_W3_ThirdPerson", sb, "W3");
             // 地铁出口：需要先点亮，且要买票（200 信用点）才能乘车去霓虹街区
-            LevelKit.BuildExitPortal(root, "W3_ExitPortal", new Vector3(0f, 0f, Z1 - 5f), 180f,
-                new Color(0.30f, 0.95f, 0.85f, 0.45f), new Color(0.35f, 1f, 0.9f),
-                mats.Metal, "", sb, "W3", true, 200);
-            LevelKit.BuildIntro(root, "地下的灯还在闪。顺着站台往北走，尽头有向上的出口。", 1.6f);
+            // 出口不再用传送门：站台东侧的列车门就是唯一出口（200 信用点上车，到站自动进 W4）
+            LevelKit.BuildIntro(root, "地下的灯还在闪。走到站台东侧，刷信用点登上列车。", 1.6f);
 
             sb.AppendLine("[W3] 地砖=" + floor + " 墙段=" + walls);
             LevelKit.SaveAndRegister(scene, ScenePath, "W2_Wasteland.unity", sb, "W3");

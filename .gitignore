@@ -56,3 +56,8 @@ Assets/_TerrainAutoUpgrade/
 /*.png
 /probe_out.txt
 unity_restart.log
+
+# 本地临时产物
+backup/
+unity_prev.log
+regress_run.log

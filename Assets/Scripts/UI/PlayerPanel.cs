@@ -39,12 +39,21 @@ namespace MedusaHorror.UI
 
         int _page;
         int _bagFilter;
+        int _bagSel = -1;
         bool _open;
         bool _shown = true;
         Canvas _canvas;
-        Text _tabText;
         Text _body;
         Text _hint;
+
+        // 素材化 UI
+        Image[] _tabImgs;
+        RectTransform _bagGrid;
+        Image[] _slotIcons;
+        Text[] _slotTexts;
+        Image[] _slotHighlights;
+        RectTransform _bodyRect;
+        const int SlotCount = 9;
 
         static readonly string[] PageNames = { "属性", "装备", "背包", "帮助" };
         static readonly string[] BagFilters = { "全部", "消耗", "材料", "任务", "钥匙", "纪念" };
@@ -98,6 +107,7 @@ namespace MedusaHorror.UI
                 for (int i = 0; i < 9; i++)
                 {
                     if (!Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
+                    _bagSel = i;
                     if (shift) DropItem(i); else UseItem(i);
                     return;
                 }
@@ -108,6 +118,7 @@ namespace MedusaHorror.UI
         {
             if (page >= 0) _page = Mathf.Clamp(page, 0, PageNames.Length - 1);
             _open = true;
+            if (_bagSel < 0 && FilteredItems().Count > 0) _bagSel = 0;
             InputReader.blocked = true;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -196,24 +207,62 @@ namespace MedusaHorror.UI
 
         void Refresh()
         {
-            if (_tabText != null)
+            // 页签高亮：选中态用素材包的亮按钮，其余用暗按钮
+            if (_tabImgs != null)
             {
-                var tb = new StringBuilder();
-                tb.Append("◀ Q     ");
-                for (int i = 0; i < PageNames.Length; i++)
+                for (int i = 0; i < _tabImgs.Length; i++)
                 {
-                    if (i > 0) tb.Append("   ·   ");
-                    tb.Append(i == _page ? "【" + PageNames[i] + "】" : PageNames[i]);
+                    if (_tabImgs[i] == null) continue;
+                    _tabImgs[i].sprite = i == _page ? UiAtlas.ButtonOn : UiAtlas.ButtonOff;
+                    _tabImgs[i].color = i == _page
+                        ? new Color(0.55f, 0.95f, 1f, 1f)
+                        : new Color(0.78f, 0.86f, 0.94f, 0.85f);
                 }
-                tb.Append("     E ▶");
-                _tabText.text = tb.ToString();
             }
+
+            bool bag = _page == 2;
+            if (_bagGrid != null) _bagGrid.gameObject.SetActive(bag);
+            if (_bodyRect != null)
+            {
+                // 背包页把文字区压到下半屏，给 3×3 格子让位
+                if (bag)
+                {
+                    _bodyRect.offsetMin = new Vector2(240f, 108f);
+                    _bodyRect.offsetMax = new Vector2(-240f, -470f);
+                }
+                else
+                {
+                    _bodyRect.offsetMin = new Vector2(240f, 108f);
+                    _bodyRect.offsetMax = new Vector2(-240f, -132f);
+                }
+            }
+            if (bag) FillBagGrid();
+
             if (_body != null) _body.text = BuildPage(_page);
             if (_hint != null)
                 _hint.text = _page == 2
-                    ? "数字键 1-9 使用 · Shift+数字 丢弃 · F 切分类 · Q/E 换页 · Tab/Esc 关闭"
-                    : "Q / E 切换页签 · Tab / Esc 关闭";
+                    ? "点击格子或数字键 1-9 使用 · Shift+数字 丢弃 · F 切分类 · Q/E 换页 · Tab/Esc 关闭"
+                    : "Q / E 或点击页签切换 · Tab / Esc 关闭";
         }
+
+        /// <summary>刷新背包格子内容。</summary>
+        void FillBagGrid()
+        {
+            var list = FilteredItems();
+            for (int i = 0; i < SlotCount; i++)
+            {
+                bool has = i < list.Count;
+                if (_slotIcons[i] != null)
+                    _slotIcons[i].color = has
+                        ? new Color(0.55f, 0.82f, 1f, 0.55f)
+                        : new Color(0.50f, 0.60f, 0.70f, 0.16f);
+                if (_slotTexts[i] != null)
+                    _slotTexts[i].text = has ? (list[i].name + "\n×" + list[i].count) : "";
+                if (_slotHighlights[i] != null)
+                    _slotHighlights[i].enabled = has && i == _bagSel;
+            }
+        }
+
 
         string BuildPage(int page)
         {
@@ -370,6 +419,27 @@ namespace MedusaHorror.UI
                 sb.AppendLine("任务物品、钥匙、石英粉之类的东西会自动放进这里。");
                 return sb.ToString();
             }
+
+            // 有格子视图时文字区只显示选中物品的详情，避免和格子重复
+            if (_slotTexts != null)
+            {
+                sb.AppendLine();
+                if (_bagSel >= 0 && _bagSel < list.Count)
+                {
+                    var sel = list[_bagSel];
+                    sb.AppendLine("已选 [" + (_bagSel + 1) + "]  [" + sel.kind + "]  " + sel.name + " ×" + sel.count);
+                    if (!string.IsNullOrEmpty(sel.desc)) sb.AppendLine("  " + sel.desc);
+                    sb.AppendLine();
+                    sb.AppendLine("数字键或点击格子使用 · Shift+数字丢弃（任务物品和钥匙不能丢）");
+                }
+                else
+                {
+                    sb.AppendLine("点击格子或按数字键 1-9 选择物品。");
+                }
+                if (list.Count > 9) sb.AppendLine("……还有 " + (list.Count - 9) + " 种未显示");
+                return sb.ToString();
+            }
+
             for (int i = 0; i < list.Count && i < 9; i++)
             {
                 var it = list[i];
@@ -432,16 +502,16 @@ namespace MedusaHorror.UI
 
             var font = CjkFont.Get();
 
-            _tabText = MakeText(go.transform, font, 36, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1500f, 70f),
-                new Color(1f, 0.85f, 0.35f));
+            BuildTabs(go.transform, font);
+            BuildArrows(go.transform);
+            BuildBagGrid(go.transform, font);
 
             _body = MakeText(go.transform, font, 28, TextAnchor.UpperLeft,
                 new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
                 new Color(0.92f, 0.96f, 1f));
-            var brt2 = _body.rectTransform;
-            brt2.offsetMin = new Vector2(240f, 108f);
-            brt2.offsetMax = new Vector2(-240f, -132f);
+            _bodyRect = _body.rectTransform;
+            _bodyRect.offsetMin = new Vector2(240f, 108f);
+            _bodyRect.offsetMax = new Vector2(-240f, -132f);
             _body.lineSpacing = 1.22f;
 
             _hint = MakeText(go.transform, font, 26, TextAnchor.MiddleCenter,
@@ -451,6 +521,145 @@ namespace MedusaHorror.UI
             UiSkin.Apply(go.GetComponent<RectTransform>());
             go.SetActive(false);
         }
+
+        /// <summary>顶部四个页签按钮，用素材包的按钮图（选中/常态两态）。</summary>
+        void BuildTabs(Transform parent, Font font)
+        {
+            _tabImgs = new Image[PageNames.Length];
+            const float w = 240f, h = 76f, gap = 16f;
+
+            for (int i = 0; i < PageNames.Length; i++)
+            {
+                var b = new GameObject("Tab" + i, typeof(RectTransform));
+                b.transform.SetParent(parent, false);
+                var rt = b.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 1f);
+                rt.anchorMax = new Vector2(0.5f, 1f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2((i - (PageNames.Length - 1) * 0.5f) * (w + gap), -76f);
+                rt.sizeDelta = new Vector2(w, h);
+
+                var img = b.AddComponent<Image>();
+                img.sprite = UiAtlas.ButtonOff;
+                img.type = Image.Type.Sliced;
+                img.color = new Color(1f, 1f, 1f, 0.92f);
+                _tabImgs[i] = img;
+
+                int idx = i;
+                var btn = b.AddComponent<Button>();
+                btn.targetGraphic = img;
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(delegate { _page = idx; Refresh(); });
+
+                var t = MakeText(b.transform, font, 30, TextAnchor.MiddleCenter,
+                    Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                    new Color(0.86f, 0.95f, 1f));
+                t.text = PageNames[i];
+                t.raycastTarget = false;
+            }
+        }
+
+        /// <summary>左右翻页箭头，用素材包的箭头图旋转。</summary>
+        void BuildArrows(Transform parent)
+        {
+            for (int d = -1; d <= 1; d += 2)
+            {
+                var a = new GameObject(d < 0 ? "ArrowLeft" : "ArrowRight", typeof(RectTransform));
+                a.transform.SetParent(parent, false);
+                var rt = a.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(d * 86f, 0f);
+                rt.sizeDelta = new Vector2(84f, 84f);
+                rt.localRotation = Quaternion.Euler(0f, 0f, d < 0 ? 90f : -90f);
+
+                var img = a.AddComponent<Image>();
+                img.sprite = UiAtlas.Arrow;
+                img.color = new Color(0.75f, 0.93f, 1f, 0.8f);
+                img.preserveAspect = true;
+
+                int dir = d;
+                var btn = a.AddComponent<Button>();
+                btn.targetGraphic = img;
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(delegate
+                {
+                    _page = (_page + dir + PageNames.Length) % PageNames.Length;
+                    Refresh();
+                });
+            }
+        }
+
+        /// <summary>背包 3×3 物品格子，格底用素材包的图标框，选中格用取景框高亮。</summary>
+        void BuildBagGrid(Transform parent, Font font)
+        {
+            const int cols = 3, rows = 3;
+            const float cw = 210f, ch = 150f, gap = 18f;
+
+            var grid = new GameObject("BagGrid", typeof(RectTransform));
+            grid.transform.SetParent(parent, false);
+            _bagGrid = grid.GetComponent<RectTransform>();
+            _bagGrid.anchorMin = _bagGrid.anchorMax = new Vector2(0.5f, 0.5f);
+            _bagGrid.pivot = new Vector2(0.5f, 0.5f);
+            _bagGrid.sizeDelta = new Vector2(cols * cw + (cols - 1) * gap, rows * ch + (rows - 1) * gap);
+            _bagGrid.anchoredPosition = new Vector2(0f, 70f);
+
+            _slotIcons = new Image[SlotCount];
+            _slotTexts = new Text[SlotCount];
+            _slotHighlights = new Image[SlotCount];
+
+            for (int i = 0; i < SlotCount; i++)
+            {
+                int col = i % cols, row = i / cols;
+
+                var s = new GameObject("Slot" + i, typeof(RectTransform));
+                s.transform.SetParent(_bagGrid, false);
+                var rt = s.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(cw, ch);
+                rt.anchoredPosition = new Vector2(
+                    (col - (cols - 1) * 0.5f) * (cw + gap),
+                    -(row - (rows - 1) * 0.5f) * (ch + gap));
+
+                var bgImg = s.AddComponent<Image>();
+                bgImg.sprite = UiAtlas.Icon;
+                bgImg.color = new Color(0.55f, 0.78f, 0.95f, 0.30f);
+                bgImg.preserveAspect = true;
+                bgImg.raycastTarget = true;
+                _slotIcons[i] = bgImg;
+
+                var hl = new GameObject("Highlight", typeof(RectTransform));
+                hl.transform.SetParent(s.transform, false);
+                var hrt = hl.GetComponent<RectTransform>();
+                hrt.anchorMin = Vector2.zero;
+                hrt.anchorMax = Vector2.one;
+                hrt.offsetMin = new Vector2(-6f, -6f);
+                hrt.offsetMax = new Vector2(6f, 6f);
+                var hImg = hl.AddComponent<Image>();
+                hImg.sprite = UiAtlas.Indicator;
+                hImg.type = Image.Type.Sliced;
+                hImg.color = new Color(0.32f, 0.92f, 1f, 0.95f);
+                hImg.raycastTarget = false;
+                _slotHighlights[i] = hImg;
+
+                var t = MakeText(s.transform, font, 22, TextAnchor.MiddleCenter,
+                    Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-14f, -10f),
+                    new Color(0.94f, 0.98f, 1f));
+                t.text = "";
+                t.raycastTarget = false;
+                _slotTexts[i] = t;
+
+                int idx = i;
+                var btn = s.AddComponent<Button>();
+                btn.targetGraphic = bgImg;
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(delegate { _bagSel = idx; Refresh(); });
+            }
+
+            grid.SetActive(false);
+        }
+
 
         static Text MakeText(Transform parent, Font font, int size, TextAnchor anchor,
             Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 sizeDelta, Color color)

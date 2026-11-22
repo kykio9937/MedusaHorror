@@ -1898,6 +1898,139 @@ public static class W1Pump
         }
 
         if (op == "LOADSCENE") return LoadSceneCmd(parts.Length > 1 ? parts[1] : "MainMenu");
+        if (op == "TREE") return MedusaHorror.EditorTools.SceneRestore.Tree(parts.Length > 1 ? parts[1].Trim() : "");
+        if (op == "SCRIPTLIST") return ScriptList(parts.Length > 1 ? parts[1].Trim() : "");
+        if (op == "INVFLOOR")
+        {
+            var iv = _lastCmd.Split('|');
+            if (iv.Length < 7) return "[INVFLOOR] 用法 INVFLOOR|场景|minX|maxX|minZ|maxZ|y";
+            float V(int i) { return float.Parse(iv[i].Trim(), CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.AddInvisibleFloor(iv[1].Trim(), V(2), V(3), V(4), V(5), V(6));
+        }
+        if (op == "NOCLIPTYPE")
+        {
+            var nt = _lastCmd.Split('|');
+            if (nt.Length < 3) return "[NOCLIPTYPE] 用法 NOCLIPTYPE|场景|类型名";
+            return MedusaHorror.EditorTools.SceneRestore.StripColliderType(nt[1].Trim(), nt[2].Trim());
+        }
+        if (op == "WALKMAP")
+        {
+            var wm = _lastCmd.Split('|');
+            if (wm.Length < 7) return "[WALKMAP] 用法 WALKMAP|场景|cell|x0|z0|x1|z1";
+            float W(int i) { return float.Parse(wm[i].Trim(), CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.WalkMap(wm[1].Trim(), W(2), W(3), W(4), W(5), W(6));
+        }
+        if (op == "SETYAW")
+        {
+            var sy = _lastCmd.Split('|');
+            if (sy.Length < 4) return "[SETYAW] 用法 SETYAW|场景|对象名|yaw";
+            return MedusaHorror.EditorTools.SceneRestore.SetYaw(sy[1].Trim(), sy[2].Trim(),
+                float.Parse(sy[3].Trim(), CultureInfo.InvariantCulture));
+        }
+        if (op == "ADDBOUNDS")
+        {
+            var ab = _lastCmd.Split('|');
+            if (ab.Length < 8) return "[ADDBOUNDS] 用法 ADDBOUNDS|场景|minX|maxX|minZ|maxZ|y|h";
+            float F(int i) { return float.Parse(ab[i].Trim(), CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.AddBounds(ab[1].Trim(), F(2), F(3), F(4), F(5), F(6), F(7));
+        }
+        if (op == "NOCLIP")
+        {
+            var nc = _lastCmd.Split('|');
+            if (nc.Length < 3) return "[NOCLIP] 用法 NOCLIP|场景|关键词";
+            return MedusaHorror.EditorTools.SceneRestore.StripColliders(nc[1].Trim(), nc[2].Trim());
+        }
+        if (op == "PORTALUNLOCK")
+        {
+            var pu = _lastCmd.Split('|');
+            if (pu.Length < 3) return "[PORTALUNLOCK] 用法 PORTALUNLOCK|场景|对象名";
+            return MedusaHorror.EditorTools.SceneRestore.UnlockPortal(pu[1].Trim(), pu[2].Trim());
+        }
+        if (op == "PORTALNEXT")
+        {
+            var pn = _lastCmd.Split('|');
+            if (pn.Length < 4) return "[PORTALNEXT] 用法 PORTALNEXT|场景|对象名|目标场景";
+            return MedusaHorror.EditorTools.SceneRestore.SetPortalNext(pn[1].Trim(), pn[2].Trim(), pn[3].Trim());
+        }
+        if (op == "BULKSET")
+        {
+            var bp = _lastCmd.Split('|');
+            if (bp.Length < 3) return "[BULKSET] 用法 BULKSET|场景|name,x,y,z|...";
+            var list = new string[bp.Length - 2];
+            System.Array.Copy(bp, 2, list, 0, list.Length);
+            return MedusaHorror.EditorTools.SceneRestore.BulkSet(bp[1].Trim(), list);
+        }
+        if (op == "SETPOS")
+        {
+            var sp = _lastCmd.Split('|');
+            if (sp.Length < 6) return "[SETPOS] 用法 SETPOS|场景|对象名|x|y|z";
+            float S(int i) { return float.Parse(sp[i].Trim(), System.Globalization.CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.SetPos(sp[1].Trim(), sp[2].Trim(), S(3), S(4), S(5));
+        }
+        if (op == "REPLACENPC")
+        {
+            var rp = _lastCmd.Split('|');
+            if (rp.Length < 3) return "[REPLACENPC] 用法 REPLACENPC|场景|预制体";
+            return MedusaHorror.EditorTools.SceneRestore.ReplaceNpcs(rp[1].Trim(), rp[2].Trim());
+        }
+        if (op == "NPCINFO")
+        {
+            string key = parts.Length > 1 ? parts[1].Trim() : "NPC_";
+            var sbn = new System.Text.StringBuilder();
+            var gos = Resources.FindObjectsOfTypeAll<GameObject>();
+            int shown = 0;
+            foreach (var g in gos)
+            {
+                if (g == null || !g.scene.IsValid() || !g.name.Contains(key)) continue;
+                sbn.AppendLine("GO " + g.name + " pos=" + g.transform.position.ToString("F2"));
+                var rs = g.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < rs.Length; i++)
+                {
+                    var r = rs[i];
+                    var m = r.sharedMaterial;
+                    sbn.AppendLine("  " + r.GetType().Name + " '" + r.name + "' mat=" + (m != null ? m.name : "null")
+                        + " shader=" + (m != null && m.shader != null ? m.shader.name : "null")
+                        + " tex=" + (m != null && m.mainTexture != null ? m.mainTexture.name : "null"));
+                }
+                shown++;
+                if (shown >= 2) break;
+            }
+            if (shown == 0) sbn.AppendLine("[NPCINFO] 未找到 " + key);
+            return sbn.ToString();
+        }
+        if (op == "RESTORE")
+        {
+            var ra = _lastCmd.Split('|');
+            if (ra.Length < 6) return "[RESTORE] 用法 RESTORE|关卡路径|原场景路径|ox|oy|oz";
+            float F(int i) { return float.Parse(ra[i].Trim(), System.Globalization.CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.RestoreLevel(ra[1].Trim(), ra[2].Trim(), F(3), F(4), F(5));
+        }
+        if (op == "FLOOR")
+        {
+            var fa = _lastCmd.Split('|');
+            if (fa.Length < 7) return "[FLOOR] 用法 FLOOR|场景|x0|z0|x1|z1|n";            float G(int i) { return float.Parse(fa[i].Trim(), System.Globalization.CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.FloorProbe(fa[1].Trim(), G(2), G(3), G(4), G(5), (int)G(6));
+        }
+        if (op == "ADDFLOOR")
+        {
+            var da = _lastCmd.Split('|');
+            if (da.Length < 8) return "[ADDFLOOR] 用法 ADDFLOOR|场景|cx|cz|sx|sz|y|材质路径";
+            float H(int i) { return float.Parse(da[i].Trim(), System.Globalization.CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.AddFloor(da[1].Trim(), H(2), H(3), H(4), H(5), H(6), da[7].Trim());
+        }
+        if (op == "ADDHILLS")
+        {
+            var ha = _lastCmd.Split('|');
+            if (ha.Length < 6) return "[ADDHILLS] 用法 ADDHILLS|场景|cx|cz|baseY|贴图";
+            float K(int i) { return float.Parse(ha[i].Trim(), System.Globalization.CultureInfo.InvariantCulture); }
+            return MedusaHorror.EditorTools.SceneRestore.AddHills(ha[1].Trim(), K(2), K(3), K(4), ha[5].Trim());
+        }
+        if (op == "REMOVEOBJ")
+        {
+            var oa = _lastCmd.Split('|');
+            if (oa.Length < 3) return "[REMOVEOBJ] 用法 REMOVEOBJ|场景|对象名";
+            return MedusaHorror.EditorTools.SceneRestore.RemoveObj(oa[1].Trim(), oa[2].Trim());
+        }
 
 
 
@@ -1941,6 +2074,7 @@ public static class W1Pump
 
         if (op == "PING") return "PONG unity=" + Application.unityVersion + " scene=" + EditorSceneManager.GetActiveScene().name;
 
+        if (op == "HIT") return HitProbe(parts);
         if (op == "P0DIAG") return MedusaHorror.EditorTools.P0Diag.Run();
         if (op == "PERF")
         {
@@ -12755,6 +12889,72 @@ public static class W1Pump
 
 
 
+
+    // SCRIPTLIST|场景：列出场景里所有项目脚本（类型 + 数量 + 前几个对象名）
+    static string ScriptList(string path)
+    {
+        if (EditorApplication.isPlaying) return "[SCRIPTLIST] 播放中拒绝，先 STOPPLAY";
+        if (!System.IO.File.Exists(path)) return "[SCRIPTLIST] 不存在: " + path;
+
+        var sc = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+        var count = new Dictionary<string, int>();
+        var names = new Dictionary<string, List<string>>();
+
+        foreach (var root in sc.GetRootGameObjects())
+        {
+            var mbs = root.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < mbs.Length; i++)
+            {
+                var mb = mbs[i];
+                if (mb == null) continue;
+                var t = mb.GetType();
+                if (t.Namespace == null || !t.Namespace.StartsWith("MedusaHorror")) continue;
+                string key = t.Name;
+                if (!count.ContainsKey(key)) { count[key] = 0; names[key] = new List<string>(); }
+                count[key]++;
+                if (names[key].Count < 4 && !names[key].Contains(mb.gameObject.name))
+                    names[key].Add(mb.gameObject.name);
+            }
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("[SCRIPTLIST] " + sc.name + " types=" + count.Count);
+        foreach (var kv in count.OrderByDescending(k => k.Value))
+        {
+            sb.Append(kv.Key).Append(" x").Append(kv.Value).Append(" : ")
+              .Append(string.Join(", ", names[kv.Key].ToArray())).AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    // HIT|dx|dz|距离：从玩家胸口水平打射线，报出挡住的东西
+    static string HitProbe(string[] parts)
+    {
+        var tp = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>();
+        if (tp == null) return "HIT=NULL(需在 Play 模式)";
+        float dx = parts.Length > 1 ? float.Parse(parts[1], CultureInfo.InvariantCulture) : 1f;
+        float dz = parts.Length > 2 ? float.Parse(parts[2], CultureInfo.InvariantCulture) : 0f;
+        float dist = parts.Length > 3 ? float.Parse(parts[3], CultureInfo.InvariantCulture) : 6f;
+        Vector3 dir = new Vector3(dx, 0f, dz);
+        if (dir.sqrMagnitude < 0.001f) return "HIT=方向无效";
+        dir.Normalize();
+
+        var sb = new StringBuilder();
+        sb.Append("HIT from=").Append(tp.transform.position.ToString("F2")).Append(" dir=").Append(dir.ToString("F2"));
+        var hits = Physics.RaycastAll(tp.transform.position + Vector3.up * 0.9f, dir, dist);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        for (int i = 0; i < hits.Length && i < 5; i++)
+        {
+            var t = hits[i].collider.transform;
+            string path = t.name;
+            var cur = t.parent;
+            for (int k = 0; k < 3 && cur != null; k++) { path = cur.name + "/" + path; cur = cur.parent; }
+            sb.Append("\n  ").Append(hits[i].distance.ToString("F2")).Append("m ").Append(path)
+              .Append(" [").Append(hits[i].collider.GetType().Name).Append("]");
+        }
+        if (hits.Length == 0) sb.Append("\n  无命中");
+        return sb.ToString();
+    }
 
     static string InteractPulse()
 

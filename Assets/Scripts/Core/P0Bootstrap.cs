@@ -60,6 +60,9 @@ namespace MedusaHorror.Core
             // 角色补光：UnityChan 卡通 shader 只吃平行光，没有平行光的场景角色会渲染成黑剪影
             EnsureCharacterLight();
 
+            // 地下铁换成星空天空盒
+            if (scene.name == SubwayScene) StarSkybox.Ensure();
+
             // 每次进入关卡都从「未拿钥匙、Boss 未死」开始，避免基地往返后门禁残留
             MedusaHorror.Gameplay.ExitPortal.ResetStaticState();
 
@@ -129,23 +132,33 @@ namespace MedusaHorror.Core
 
         // ---------------- 角色补光 ----------------
 
-        /// <summary>场景里没有平行光时补一盏弱平行光，否则角色会变成黑剪影。</summary>
+        /// <summary>
+        /// 角色补光：UnityChan 卡通 shader 只吃平行光，室内关卡原有灯照不到角色时会渲染成黑剪影。
+        /// 所以不管场景有没有平行光，都保证有一盏专供角色的补光。
+        /// </summary>
         static void EnsureCharacterLight()
         {
-            var lights = Object.FindObjectsOfType<Light>(true);
-            for (int i = 0; i < lights.Length; i++)
+            var exist = GameObject.Find("P0_CharacterFill");
+            Light l;
+            if (exist == null)
             {
-                if (lights[i] == null || !lights[i].enabled) continue;
-                if (lights[i].type == LightType.Directional) return;
+                var go = new GameObject("P0_CharacterFill");
+                l = go.AddComponent<Light>();
+                l.type = LightType.Directional;
+                l.color = new Color(0.92f, 0.95f, 1f);
+                l.shadows = LightShadows.None;
+                go.transform.rotation = Quaternion.Euler(48f, -30f, 0f);
             }
+            else
+            {
+                l = exist.GetComponent<Light>();
+                if (l == null) return;
+            }
+            l.intensity = 0.85f;
 
-            var go = new GameObject("P0_CharacterFill");
-            var l = go.AddComponent<Light>();
-            l.type = LightType.Directional;
-            l.color = new Color(0.88f, 0.92f, 1f);
-            l.intensity = 0.5f;
-            l.shadows = LightShadows.None;
-            go.transform.rotation = Quaternion.Euler(52f, -28f, 0f);
+            // 室内关卡环境光普遍偏低，角色和地面都糊成一片黑，顺手抬一点
+            if (RenderSettings.ambientIntensity < 0.65f)
+                RenderSettings.ambientIntensity = 0.65f;
         }
 
         // ---------------- NPC 外观差异化 ----------------
@@ -189,7 +202,11 @@ namespace MedusaHorror.Core
                 if (go.GetComponent<MedusaHorror.Gameplay.NpcVariation>() != null) continue;
 
                 var v = go.AddComponent<MedusaHorror.Gameplay.NpcVariation>();
-                v.seed = go.GetInstanceID();
+                // 用名字 + 位置生成稳定种子，避免每次进场景换脸
+                var pos = go.transform.position;
+                v.seed = go.name.GetHashCode()
+                       ^ Mathf.RoundToInt(pos.x * 10f)
+                       ^ (Mathf.RoundToInt(pos.z * 10f) << 8);
                 added++;
             }
             if (added > 0) Debug.Log("[P0] NPC 外观差异化：" + added + " 个");
@@ -218,7 +235,7 @@ namespace MedusaHorror.Core
             switch (scene.name)
             {
                 case WastelandScene: title = "走访荒废村庄 · 抵达村口传送门"; break;
-                case SubwayScene: title = "穿过地下铁 · 抵达传送门"; break;
+                case SubwayScene: title = "登上列车 · 前往霓虹街区"; break;
                 case NeonStreetScene: title = "穿过霓虹街区 · 抵达传送门"; break;
                 default: title = "抵达外星星门"; break;
             }
@@ -250,19 +267,35 @@ namespace MedusaHorror.Core
 
             var portal = Object.FindObjectOfType<ExitPortal>(true);
 
-            // 2) 没有路径标记的场景：沿「出生点 → 传送门」补两个中途探索点
-            if (!hasMarker && portal != null)
+            // 没有传送门的关卡（地下铁）：出口就是列车车门
+            Transform exitPoint = portal != null ? portal.transform : null;
+            if (exitPoint == null)
+            {
+                var board = Object.FindObjectOfType<MedusaHorror.Gameplay.TrainBoardPoint>(true);
+                if (board != null) exitPoint = board.transform;
+            }
+
+            // 2) 没有路径标记的场景：沿「出生点 → 出口」补两个中途探索点
+            if (!hasMarker && exitPoint != null)
             {
                 var spawn = Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(true);
                 if (spawn != null)
                 {
                     Vector3 a = spawn.transform.position;
-                    Vector3 b = portal.transform.position;
+                    Vector3 b = exitPoint.position;
                     for (int i = 1; i <= 2; i++)
                     {
                         Vector3 p = Vector3.Lerp(a, b, i / 3f);
                         NavMeshHit hit;
                         if (NavMesh.SamplePosition(p, out hit, 14f, NavMesh.AllAreas)) p = hit.position;
+                        else
+                        {
+                            // 素材包原场景没有烘焙 NavMesh，改用向下射线贴地
+                            RaycastHit gh;
+                            if (Physics.Raycast(p + Vector3.up * 80f, Vector3.down, out gh, 300f,
+                                                ~0, QueryTriggerInteraction.Ignore))
+                                p = gh.point;
+                        }
                         AddGoalPoint(root.transform, p + Vector3.up * 0.9f,
                                      GoalKind.Reach, "探索点 " + i, 4.5f, false);
                         placed++;
@@ -270,11 +303,11 @@ namespace MedusaHorror.Core
                 }
             }
 
-            // 3) 出口传送门：本关必需目标
-            if (portal != null)
+            // 3) 出口：本关必需目标
+            if (exitPoint != null)
             {
-                AddGoalPoint(root.transform, portal.transform.position + Vector3.up * 0.9f,
-                             GoalKind.Reach, "传送门", 2.8f, true);
+                AddGoalPoint(root.transform, exitPoint.position + Vector3.up * 0.9f,
+                             GoalKind.Reach, portal != null ? "传送门" : "列车", 2.8f, true);
                 placed++;
             }
             else if (placed > 0)
