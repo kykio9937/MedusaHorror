@@ -42,6 +42,10 @@ namespace MedusaHorror.EditorTools
             int walks = BuildSideWalks(root, sb);
             int builds = BuildBuildings(root, sb);
             int props = BuildProps(root, sb);
+            BuildVillageSquare(root, sb);
+            int sqBuilds = BuildSquareBuildings(root, sb);
+            int npcs = BuildNpcs(root, sb);
+            int items = BuildQuestItems(root, sb);
             BuildAtmosphere(root, sb);
             var player = BuildPlayer(root, sb);
             BuildCamera(player, sb);
@@ -63,7 +67,8 @@ namespace MedusaHorror.EditorTools
             list.Insert(insertAt, new EditorBuildSettingsScene(ScenePath, true));
             EditorBuildSettings.scenes = list.ToArray();
 
-            sb.AppendLine("[W2] 保存完成 road=" + roads + " walk=" + walks + " build=" + builds + " prop=" + props);
+            sb.AppendLine("[W2] 保存完成 road=" + roads + " walk=" + walks + " build=" + builds + " prop=" + props
+                          + " 广场房=" + sqBuilds + " NPC=" + npcs + " 任务物=" + items);
             sb.AppendLine("[W2] BuildSettings=" + DescribeBuildSettings());
             return sb.ToString();
         }
@@ -152,6 +157,8 @@ namespace MedusaHorror.EditorTools
             int i = 0;
             while (z < Z1 - 10f)
             {
+                // 中央广场区域留空，交给 BuildSquareBuildings 围合
+                if (Mathf.Abs(z) < 22f) { z += 26f; i++; continue; }
                 for (int side = -1; side <= 1; side += 2)
                 {
                     string path = facades[(i * 2 + (side > 0 ? 1 : 0)) % facades.Length];
@@ -269,15 +276,15 @@ namespace MedusaHorror.EditorTools
             player.transform.position = new Vector3(0f, 0.25f, Z0 + 10f);
             player.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
 
-            if (player.GetComponent<CharacterController>() == null)
-            {
-                var cc = player.AddComponent<CharacterController>();
-                cc.height = 1.7f;
-                cc.radius = 0.34f;
-                cc.center = new Vector3(0f, 0.85f, 0f);
-                cc.slopeLimit = 50f;
-                cc.stepOffset = 0.35f;
-            }
+            // 碰撞体对齐模型实际包围盒，避免角色陷进地面
+            var cc = player.GetComponent<CharacterController>();
+            if (cc == null) cc = player.AddComponent<CharacterController>();
+            cc.height = 1.72f;
+            cc.radius = 0.34f;
+            cc.center = new Vector3(0f, 0.67f, 0f);
+            cc.skinWidth = 0.03f;
+            cc.slopeLimit = 50f;
+            cc.stepOffset = 0.35f;
             if (player.GetComponent<InputReader>() == null) player.AddComponent<InputReader>();
             if (player.GetComponent<ThirdPersonController>() == null) player.AddComponent<ThirdPersonController>();
             if (player.GetComponent<PlayerInteractor>() == null) player.AddComponent<PlayerInteractor>();
@@ -403,6 +410,7 @@ namespace MedusaHorror.EditorTools
             portal.door = null;
             portal.fxRoot = fx;
             portal.requireKey = false;
+            portal.requireActivation = true;
             portal.halfWidth = 1.45f;
             portal.halfDepth = 1.2f;
             portal.lowerY = -0.3f;
@@ -411,13 +419,267 @@ namespace MedusaHorror.EditorTools
             sb.AppendLine("[W2] 出口门洞 pos=" + exitRoot.transform.position.ToString("F1"));
         }
 
+        // ------------------------------------------------------------------ 荒废村庄
+        /// <summary>中央广场：石板地面 + 中央篝火 + 四角木桩。</summary>
+        static void BuildVillageSquare(Transform root, StringBuilder sb)
+        {
+            var stoneMat = LoadMat("Assets/ApocalypticWasteland/UrbanAssets/Materials/BetonBase_ALBEDO.mat");
+            if (stoneMat == null) stoneMat = LoadMat("Assets/ApocalypticWasteland/UrbanAssets/Materials/Roads_Albedo.mat");
+            stoneMat = MakeTinted("W2_SquareStone", stoneMat, new Color(0.46f, 0.43f, 0.39f));
+
+            var plaza = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            plaza.name = "VillageSquare";
+            plaza.transform.SetParent(root, false);
+            plaza.transform.position = new Vector3(0f, 0.04f, 0f);
+            plaza.transform.localScale = new Vector3(34f, 0.14f, 34f);
+            ApplyMat(plaza, stoneMat);
+
+            // 中央篝火：石圈 + 发光火堆 + 点光
+            var fire = new GameObject("SquareCampfire");
+            fire.transform.SetParent(root, false);
+            fire.transform.position = new Vector3(0f, 0.1f, 0f);
+
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i * Mathf.PI * 2f / 8f;
+                var rock = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                rock.name = "FireRock" + i;
+                rock.transform.SetParent(fire.transform, false);
+                rock.transform.localPosition = new Vector3(Mathf.Cos(a) * 1.05f, 0.12f, Mathf.Sin(a) * 1.05f);
+                rock.transform.localScale = new Vector3(0.42f, 0.26f, 0.42f);
+                rock.transform.localRotation = Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f);
+                ApplyMat(rock, stoneMat);
+            }
+
+            var flame = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            flame.name = "FlameCore";
+            flame.transform.SetParent(fire.transform, false);
+            flame.transform.localPosition = new Vector3(0f, 0.42f, 0f);
+            flame.transform.localScale = new Vector3(0.7f, 1.0f, 0.7f);
+            var fr = flame.GetComponent<MeshRenderer>();
+            var fm = new Material(Shader.Find("Standard"));
+            fm.color = new Color(1f, 0.55f, 0.15f);
+            fm.EnableKeyword("_EMISSION");
+            fm.SetColor("_EmissionColor", new Color(1f, 0.45f, 0.1f) * 3.2f);
+            fr.sharedMaterial = fm;
+            Object.DestroyImmediate(flame.GetComponent<Collider>());
+
+            var fl = new GameObject("FireLight");
+            fl.transform.SetParent(fire.transform, false);
+            fl.transform.localPosition = new Vector3(0f, 1.0f, 0f);
+            var light = fl.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.6f, 0.25f);
+            light.intensity = 3.4f;
+            light.range = 14f;
+
+            // 四角木桩
+            for (int i = 0; i < 4; i++)
+            {
+                float a = Mathf.PI * 0.25f + i * Mathf.PI * 0.5f;
+                Place(URBAN + "WoodPlank1.prefab",
+                      new Vector3(Mathf.Cos(a) * 14f, 0.1f, Mathf.Sin(a) * 14f), a * Mathf.Rad2Deg, root);
+            }
+
+            sb.AppendLine("[W2] 中央广场 34x34 + 篝火");
+        }
+
+        /// <summary>广场四周围合 6 栋房屋，正面朝中心。</summary>
+        static int BuildSquareBuildings(Transform root, StringBuilder sb)
+        {
+            string[] facades =
+            {
+                BUILD + "SuBurbProperty.prefab",
+                BUILD + "SubUrbanProperty2.prefab",
+                BUILD + "SubUrbanProperty3.prefab",
+                BUILD + "SuBurbProperty5.prefab",
+                BUILD + "SuBurbProperty6.prefab",
+                BUILD + "MetalSlum1.prefab"
+            };
+            Vector3[] slots =
+            {
+                new Vector3(-20f, 0f, -20f), new Vector3(20f, 0f, -20f),
+                new Vector3(-20f, 0f, 20f),  new Vector3(20f, 0f, 20f),
+                new Vector3(-22f, 0f, 0f),   new Vector3(22f, 0f, 0f)
+            };
+            float[] yaws = { 45f, -45f, 135f, -135f, 90f, -90f };
+
+            int n = 0;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                var go = Place(facades[i % facades.Length], slots[i], yaws[i], root);
+                if (go != null) n++;
+            }
+            sb.AppendLine("[W2] 广场房屋=" + n);
+            return n;
+        }
+
+        /// <summary>6 个 NPC，各带一个小任务（收集废料），奖励货币与属性。</summary>
+        static int BuildNpcs(Transform root, StringBuilder sb)
+        {
+            // Elf_ears 只是配件（高度 7cm），必须用完整角色预制体
+            string[] models =
+            {
+                "Assets/Suriyun/Kazuko/Prefab/Kazuko.prefab",
+                "Assets/Suriyun/Kazuko/Prefab/Kazuko_nobra.prefab",
+                "Assets/Suriyun/Kazuko/Prefab/Kazuko_bikini.prefab"
+            };
+
+            var defs = new QuestDef[]
+            {
+                new QuestDef { id = "w2_scrap", npcName = "老周", title = "修好水泵",
+                    desc = "水泵散架了，帮我捡 4 块废铁回来。", kind = QuestKind.Collect,
+                    targetTag = "scrap", need = 4, rewardCoins = 120, rewardSpeed = 0.08f },
+                new QuestDef { id = "w2_herb", npcName = "阿霞", title = "熬一锅药",
+                    desc = "药罐子见底了，帮我采 3 株苦艾草。", kind = QuestKind.Collect,
+                    targetTag = "herb", need = 3, rewardCoins = 100, rewardPetrify = 0.10f },
+                new QuestDef { id = "w2_ammo", npcName = "铁柱", title = "补点家伙",
+                    desc = "枪膛空了，帮我找 3 盒旧子弹。", kind = QuestKind.Collect,
+                    targetTag = "ammo", need = 3, rewardCoins = 150, rewardDamage = 0.10f },
+                new QuestDef { id = "w2_toy", npcName = "小满", title = "找我的娃娃",
+                    desc = "我的娃娃丢在广场附近了，能帮我找回来吗？", kind = QuestKind.Collect,
+                    targetTag = "toy", need = 2, rewardCoins = 60, rewardSpeed = 0.03f },
+                new QuestDef { id = "w2_battery", npcName = "老陈", title = "续上电",
+                    desc = "发电机的电池都没电了，帮我收 5 节旧电池。", kind = QuestKind.Collect,
+                    targetTag = "battery", need = 5, rewardCoins = 200 },
+                new QuestDef { id = "w2_part", npcName = "灰帽", title = "拼个东西",
+                    desc = "我在拼一台能用的收音机，缺 6 个零件。", kind = QuestKind.Collect,
+                    targetTag = "part", need = 6, rewardCoins = 300, rewardDamage = 0.05f }
+            };
+
+            // 路面顶面约 0.28m，NPC 原点在脚底，抬到路面上
+            Vector3[] spots =
+            {
+                new Vector3(8f, 0.3f, 5f),
+                new Vector3(-8f, 0.3f, 5f),
+                new Vector3(8f, 0.3f, -6f),
+                new Vector3(-8f, 0.3f, -6f),
+                new Vector3(0f, 0.3f, 11f),
+                new Vector3(-13f, 0.3f, 0f)
+            };
+
+            int n = 0;
+            for (int i = 0; i < defs.Length; i++)
+            {
+                string path = models[i % models.Length];
+                var pf = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (pf == null) { sb.AppendLine("[W2] NPC 模型缺失: " + path); continue; }
+
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, root);
+                go.name = "NPC_" + defs[i].npcName;
+
+                // 关掉 root motion，避免动画把 NPC 带离站位
+                var anim = go.GetComponentInChildren<Animator>();
+                if (anim != null) anim.applyRootMotion = false;
+
+                // 去掉可能随预制体带进来的玩家控制脚本
+                Strip<ThirdPersonController>(go);
+                Strip<InputReader>(go);
+                Strip<PlayerInteractor>(go);
+                Strip<PlayerPetrify>(go);
+                Strip<CharacterController>(go);
+
+                Vector3 toCenter = Vector3.zero - spots[i];
+                toCenter.y = 0f;
+                if (toCenter.sqrMagnitude > 0.01f) go.transform.rotation = Quaternion.LookRotation(toCenter);
+
+                // 按模型包围盒把脚对齐到广场石板（0.11），不管预制体原点在哪
+                go.transform.position = new Vector3(spots[i].x, 0f, spots[i].z);
+                // 动画播放后模型会比 T-pose 下沉约 9cm，这里补偿对齐到石板面 0.11
+                var bb = BoundsOf(go);
+                go.transform.position += new Vector3(0f, 0.20f - bb.min.y, 0f);
+
+                if (go.GetComponent<Collider>() == null)
+                {
+                    var cap = go.AddComponent<CapsuleCollider>();
+                    cap.center = new Vector3(0f, 0.9f, 0f);
+                    cap.height = 1.8f;
+                    cap.radius = 0.4f;
+                }
+
+                var npc = go.AddComponent<NpcQuestGiver>();
+                npc.def = defs[i];
+                n++;
+            }
+            sb.AppendLine("[W2] NPC=" + n);
+            return n;
+        }
+
+        /// <summary>散落在广场与街道上的任务物品。</summary>
+        static int BuildQuestItems(Transform root, StringBuilder sb)
+        {
+            int n = 0;
+            n += AddItems(root, "scrap", "废铁", new Color(0.78f, 0.56f, 0.30f), new[]
+            {
+                new Vector3(-6f, 0f, -3f), new Vector3(7f, 0f, 8f),
+                new Vector3(-10f, 0f, 10f), new Vector3(5f, 0f, -12f)
+            });
+            n += AddItems(root, "herb", "苦艾草", new Color(0.42f, 0.82f, 0.36f), new[]
+            {
+                new Vector3(-4f, 0f, 12f), new Vector3(11f, 0f, 3f), new Vector3(-12f, 0f, -8f)
+            });
+            n += AddItems(root, "ammo", "旧子弹", new Color(0.92f, 0.80f, 0.35f), new[]
+            {
+                new Vector3(9f, 0f, -9f), new Vector3(-9f, 0f, 4f), new Vector3(3f, 0f, 15f)
+            });
+            n += AddItems(root, "toy", "娃娃", new Color(0.95f, 0.55f, 0.72f), new[]
+            {
+                new Vector3(-3f, 0f, -9f), new Vector3(13f, 0f, 0f)
+            });
+            n += AddItems(root, "battery", "旧电池", new Color(0.55f, 0.80f, 0.95f), new[]
+            {
+                new Vector3(6f, 0f, 12f), new Vector3(-7f, 0f, -14f), new Vector3(12f, 0f, -4f),
+                new Vector3(-13f, 0f, 6f), new Vector3(2f, 0f, -18f)
+            });
+            n += AddItems(root, "part", "零件", new Color(0.82f, 0.82f, 0.86f), new[]
+            {
+                new Vector3(-2f, 0f, 18f), new Vector3(14f, 0f, 8f), new Vector3(-15f, 0f, -3f),
+                new Vector3(4f, 0f, -16f), new Vector3(-6f, 0f, 16f), new Vector3(10f, 0f, -13f)
+            });
+            sb.AppendLine("[W2] 任务物品=" + n);
+            return n;
+        }
+
+        static int AddItems(Transform root, string tag, string itemName, Color color, Vector3[] positions)
+        {
+            for (int i = 0; i < positions.Length; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = "Item_" + tag + "_" + i;
+                go.transform.SetParent(root, false);
+                go.transform.position = new Vector3(positions[i].x, 0.1f, positions[i].z);
+                go.transform.localScale = new Vector3(0.34f, 0.34f, 0.34f);
+
+                var r = go.GetComponent<MeshRenderer>();
+                var m = new Material(Shader.Find("Standard"));
+                m.color = color;
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", color * 1.8f);
+                r.sharedMaterial = m;
+
+                var c = go.GetComponent<Collider>();
+                if (c != null) c.isTrigger = true;
+
+                var p = go.AddComponent<QuestPickup>();
+                p.itemTag = tag;
+                p.itemName = itemName;
+            }
+            return positions.Length;
+        }
+
+        static void Strip<T>(GameObject go) where T : Component
+        {
+            var c = go.GetComponent<T>();
+            if (c != null) Object.DestroyImmediate(c);
+        }
+
         // ------------------------------------------------------------------ 工具
         static void BuildIntro(Transform root)
         {
             var go = new GameObject("LevelIntro");
             go.transform.SetParent(root, false);
             var li = go.AddComponent<MedusaHorror.Core.LevelIntro>();
-            li.toast = "风里有铁锈味。沿着废墟街道往北，尽头有出口。";
+            li.toast = "风里有铁锈味。村庄还亮着灯，去广场看看，村口有出口。";
             li.delay = 1.6f;
         }
         static GameObject Place(string prefabPath, Vector3 pos, float yaw, Transform parent, bool snapGround = true)
