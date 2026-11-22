@@ -87,6 +87,36 @@ namespace MedusaHorror.Core
         float shakeTimer;
         bool built;
 
+        // ---------------- 关卡计时 ----------------
+        float _levelStart;
+        bool _levelTiming;
+
+        /// <summary>开始为本关计时（进入关卡时由关卡目标调用）。</summary>
+        public void BeginLevelTimer()
+        {
+            _levelStart = Time.time;
+            _levelTiming = true;
+        }
+
+        public void EndLevelTimer()
+        {
+            _levelTiming = false;
+        }
+
+        /// <summary>本关已用时（秒）。未开始计时返回 0。</summary>
+        public float LevelElapsed
+        {
+            get { return _levelTiming ? Time.time - _levelStart : 0f; }
+        }
+
+        public static string FormatTime(float seconds)
+        {
+            if (seconds <= 0f) return "--:--";
+            int m = Mathf.FloorToInt(seconds / 60f);
+            int s = Mathf.FloorToInt(seconds % 60f);
+            return m.ToString("00") + ":" + s.ToString("00");
+        }
+
         readonly List<MonoBehaviour> lensTargets = new List<MonoBehaviour>();
         readonly List<System.Reflection.FieldInfo> lensFields = new List<System.Reflection.FieldInfo>();
         readonly List<float> lensBase = new List<float>();
@@ -241,7 +271,7 @@ namespace MedusaHorror.Core
             subText.text = "石化的凝视暂时凝固 · 按 ESC 继续前行";
             hintText.text = "按 ESC 继续　·　按 R 重新开始　·　按 Q 退出游戏";
             ConfigureButtons("继续游戏 (ESC)", Resume, "返回主菜单 (M)", ToMenu);
-            ConfigureThird(null, null, false);
+            ConfigureThird("设置", OpenSettings, true);
 
             if (vignette != null) vignette.color = new Color(0.03f, 0.03f, 0.04f, 0.55f);
             if (group != null) { group.alpha = 1f; group.blocksRaycasts = true; group.interactable = true; }
@@ -269,6 +299,12 @@ namespace MedusaHorror.Core
         {
             if (State == RunState.Paused) Resume();
             else if (State == RunState.Running) Pause();
+        }
+
+        /// <summary>暂停面板打开设置页。</summary>
+        public void OpenSettings()
+        {
+            SettingsPanel.Ensure().Open();
         }
 
         void SetPlayerActive(bool on)

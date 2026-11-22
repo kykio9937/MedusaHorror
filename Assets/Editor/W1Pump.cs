@@ -1,4 +1,4 @@
-﻿// 调试命令通道：仅编辑器与显式开启 MARVIS_DEBUG 的构建中编译。
+// 调试命令通道：仅编辑器与显式开启 MARVIS_DEBUG 的构建中编译。
 // 本文件位于 Assets/Editor 下，本身就参与编辑器程序集、不会进入正式包；
 // 这里再加一层条件编译，保证即使被移到运行时目录也不会被打进构建。
 #if UNITY_EDITOR || MARVIS_DEBUG
@@ -2008,7 +2008,69 @@ public static class W1Pump
         if (op == "MPOS") return MovePlayerTo(float.Parse(parts[1], CultureInfo.InvariantCulture), float.Parse(parts[2], CultureInfo.InvariantCulture), float.Parse(parts[3], CultureInfo.InvariantCulture));
 
         if (op == "PPOS") { var tp0 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(); if (tp0 == null) return "PPOS=NULL"; var cc0 = tp0.GetComponent<CharacterController>(); return "PPOS=" + tp0.transform.position.ToString("F2") + " grounded=" + (cc0 != null ? cc0.isGrounded.ToString() : "n/a") + " cc=" + (cc0 != null ? cc0.enabled.ToString() : "n/a"); }
+        if (op == "PBOUNDS")
+        {
+            var tpB = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>();
+            if (tpB == null) return "PBOUNDS=NULL";
+            var rs = tpB.GetComponentsInChildren<Renderer>();
+            bool init = false; Bounds b = default(Bounds);
+            foreach (var r in rs)
+            {
+                if (r == null || !r.enabled) continue;
+                if (!init) { b = r.bounds; init = true; } else b.Encapsulate(r.bounds);
+            }
+            var ccB = tpB.GetComponent<CharacterController>();
+            var sbB = new System.Text.StringBuilder();
+            sbB.Append("PBOUNDS pos=").Append(tpB.transform.position.ToString("F3"));
+            if (init) sbB.Append(" minY=").Append(b.min.y.ToString("F3")).Append(" maxY=").Append(b.max.y.ToString("F3")).Append(" h=").Append(b.size.y.ToString("F3"));
+            sbB.Append(" ccH=").Append(ccB != null ? ccB.height.ToString("F2") : "-")
+               .Append(" ccC=").Append(ccB != null ? ccB.center.ToString("F2") : "-")
+               .Append(" ccR=").Append(ccB != null ? ccB.radius.ToString("F2") : "-");
+            return sbB.ToString();
+        }
+        if (op == "NPCLIST")
+        {
+            var npcs = UnityEngine.Object.FindObjectsOfType<MedusaHorror.Gameplay.NpcQuestGiver>(true);
+            var sbN = new System.Text.StringBuilder("NPCLIST n=").Append(npcs.Length);
+            for (int i = 0; i < npcs.Length; i++)
+            {
+                var n = npcs[i];
+                var rs = n.GetComponentsInChildren<Renderer>(true);
+                int vis = 0;
+                for (int j = 0; j < rs.Length; j++) if (rs[j] != null && rs[j].enabled) vis++;
+                var b = new Bounds(n.transform.position, Vector3.zero);
+                bool hasB = false;
+                for (int j = 0; j < rs.Length; j++) { if (rs[j] == null) continue; if (!hasB) { b = rs[j].bounds; hasB = true; } else b.Encapsulate(rs[j].bounds); }
+                sbN.Append(" | ").Append(n.name).Append(" pos=").Append(n.transform.position.ToString("F2"))
+                   .Append(" rend=").Append(rs.Length).Append(" on=").Append(vis)
+                   .Append(" scale=").Append(n.transform.localScale.x.ToString("F2"))
+                   .Append(hasB ? " bMinY=" + b.min.y.ToString("F2") + " bMaxY=" + b.max.y.ToString("F2") : "");
+            }
+            return sbN.ToString();
+        }
+        if (op == "PDOWN")
+        {
+            var tpD = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>();
+            if (tpD == null) return "PDOWN=NULL";
+            Vector3 origin = tpD.transform.position + Vector3.up * 0.1f;
+            var hits = UnityEngine.Physics.RaycastAll(origin, Vector3.down, 4f, ~0, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(hits, delegate (RaycastHit a, RaycastHit b2) { return a.distance.CompareTo(b2.distance); });
+            var sbD = new System.Text.StringBuilder("PDOWN n=").Append(hits.Length);
+            for (int i = 0; i < hits.Length && i < 8; i++)
+            {
+                sbD.Append(" | ").Append(hits[i].collider.name).Append(" y=").Append(hits[i].point.y.ToString("F3")).Append(" d=").Append(hits[i].distance.ToString("F2"));
+            }
+            return sbD.ToString();
+        }
         if (op == "PSET") { var tp1 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(); if (tp1 == null) return "PSET=NULL"; var cc1 = tp1.GetComponent<CharacterController>(); float px = float.Parse(parts[1], CultureInfo.InvariantCulture), py = float.Parse(parts[2], CultureInfo.InvariantCulture), pz = float.Parse(parts[3], CultureInfo.InvariantCulture); if (cc1 != null) cc1.enabled = false; tp1.transform.position = new Vector3(px, py, pz); if (cc1 != null) cc1.enabled = true; return "PSET=" + tp1.transform.position.ToString("F2"); }
+        if (op == "COINS")
+        {
+            if (parts.Length < 2) return "COINS=" + MedusaHorror.Core.Wallet.Coins;
+            int add = int.Parse(parts[1], CultureInfo.InvariantCulture);
+            if (add >= 0) MedusaHorror.Core.Wallet.Add(add);
+            else MedusaHorror.Core.Wallet.Spend(-add);
+            return "COINS=" + MedusaHorror.Core.Wallet.Coins;
+        }
         if (op == "BOSSKILL") { var boss1 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MedusaBoss>(); if (boss1 == null) return "BOSSKILL=NULL"; boss1.TakeDamage(99999f); return "BOSSKILL=done dead=" + boss1.IsDead; }
 
 
