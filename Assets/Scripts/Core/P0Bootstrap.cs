@@ -63,6 +63,10 @@ namespace MedusaHorror.Core
             // 地下铁换成星空天空盒
             if (scene.name == SubwayScene) StarSkybox.Ensure();
 
+            // 新手引导：首次进入 W1 自动播放操作提示（H 键随时重看）
+            MedusaHorror.Gameplay.TutorialDirector.Ensure();
+            MedusaHorror.Gameplay.TutorialDirector.MaybeShowOnW1(scene.name);
+
             // 每次进入关卡都从「未拿钥匙、Boss 未死」开始，避免基地往返后门禁残留
             MedusaHorror.Gameplay.ExitPortal.ResetStaticState();
 

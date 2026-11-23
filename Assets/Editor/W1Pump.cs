@@ -2613,6 +2613,23 @@ public static class W1Pump
             pet.SendMessage("TriggerDeath", UnityEngine.SendMessageOptions.DontRequireReceiver);
             return "[KILLPLAYER] dead=" + pet.Dead + " value=" + pet.value;
         }
+        if (op == "TUTORIALDIAG")
+        {
+            var td = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.TutorialDirector>(true);
+            if (td == null) return "[TUTORIALDIAG] none";
+            return "[TUTORIALDIAG] playing=" + MedusaHorror.Gameplay.TutorialDirector.Playing
+                + " step=" + MedusaHorror.Gameplay.TutorialDirector.CurrentStep
+                + "/" + MedusaHorror.Gameplay.TutorialDirector.StepCount
+                + " done=" + MedusaHorror.Core.SaveSystem.Data.tutorialDone;
+        }
+        if (op == "TUTORIALSKIP")
+        {
+            var td2 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.TutorialDirector>(true);
+            if (td2 == null) return "[TUTORIALSKIP] none";
+            td2.Skip();
+            return "[TUTORIALSKIP] playing=" + MedusaHorror.Gameplay.TutorialDirector.Playing
+                + " done=" + MedusaHorror.Core.SaveSystem.Data.tutorialDone;
+        }
         if (op == "FAILDIAG")
         {
             var gf = MedusaHorror.Core.GameFlow.Instance;

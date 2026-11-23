@@ -91,6 +91,10 @@ namespace MedusaHorror.Core
         public float damageBonus = 0f;
         public float petrifyResist = 0f;
 
+        [Header("新手引导")]
+        [Tooltip("W1 操作引导是否已播放过")]
+        public bool tutorialDone = false;
+
         [Header("角色成长")]
         public int level = 1;
         public float xp = 0f;
