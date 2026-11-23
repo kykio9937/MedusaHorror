@@ -2604,6 +2604,26 @@ public static class W1Pump
             MedusaHorror.Player.WeaponLoadout.debugSwitchTo = k;
             return "[SWITCH] queued=" + k;
         }
+        if (op == "BOSSPHASE")
+        {
+            var b = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MedusaBoss>(true);
+            if (b == null) return "[BOSSPHASE] no boss";
+            if (parts.Length > 1)
+            {
+                float h01 = float.Parse(parts[1], CultureInfo.InvariantCulture);
+                b.TakeDamage(Mathf.Max(0.01f, b.Health - b.maxHealth * h01));
+            }
+            return "[BOSSPHASE] phase=" + b.Phase + " phase2=" + b.Phase2
+                + " hp01=" + b.Health01.ToString("F2") + " state=" + b.Current
+                + " pulses=" + b.PulseCount + " hunt=" + b.huntSpeed.ToString("F2")
+                + " rage=" + b.rageSpeed.ToString("F2");
+        }
+        if (op == "BOSSPULSE")
+        {
+            var b2 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MedusaBoss>(true);
+            if (b2 == null) return "[BOSSPULSE] no boss";
+            return "[BOSSPULSE] pulses=" + b2.PulseCount + " timer01=" + b2.PulseTimer01.ToString("F2");
+        }
         if (op == "DIALOGSTART")
         {
             var giver = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.NpcQuestGiver>(true);

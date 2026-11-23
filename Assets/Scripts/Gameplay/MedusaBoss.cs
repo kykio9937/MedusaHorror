@@ -32,6 +32,13 @@ namespace MedusaHorror.Gameplay
         public float wakeDelay = 1.2f;
         public float stopDistance = 1.9f;
 
+        [Header("二阶段（狂暴形态）")]
+        [Range(0f, 1f)] public float phaseThreshold = 0.5f;
+        public float phase2SpeedMul = 1.18f;
+        public float pulseInterval = 6.5f;
+        public float pulseRadius = 14f;
+        public float pulsePetrify = 18f;
+
         [Header("表现")]
         public GameObject alertFxRoot;
 
@@ -41,6 +48,11 @@ namespace MedusaHorror.Gameplay
 
         public State Current { get; private set; } = State.Dormant;
         public float Health { get; private set; }
+        /// <summary>战斗阶段：1 = 常态，2 = 狂暴形态（血量过半触发）。</summary>
+        public int Phase { get; private set; } = 1;
+        public bool Phase2 { get { return Phase >= 2; } }
+        public int PulseCount { get; private set; }
+        public float PulseTimer01 { get { return pulseInterval <= 0.01f ? 0f : Mathf.Clamp01(_pulseTimer / pulseInterval); } }
         /// <summary>运行时调整血量与狂暴参数（供调参命令使用）</summary>
         public void ApplyStats(float hp, float rageSpd, float rageHp, float hunt = -1f, float stop = -1f)
         {
@@ -72,6 +84,10 @@ namespace MedusaHorror.Gameplay
 
         /// <summary>诊断：最近一次唤醒原因（dormant dist / floor-trigger / damage / -）</summary>
         public static string lastWake = "-";
+
+        bool _phase2;
+        float _pulseTimer;
+        Color _baseTint = new Color(0.32f, 0.34f, 0.33f, 1f);
 
         void Awake()
         {
@@ -186,12 +202,22 @@ namespace MedusaHorror.Gameplay
                 transform.rotation = Quaternion.Slerp(transform.rotation, want, 6f * dt);
             }
 
+            if (_phase2 && Current == State.Hunt)
+            {
+                _pulseTimer += dt;
+                if (_pulseTimer >= pulseInterval)
+                {
+                    _pulseTimer = 0f;
+                    CastPetrifyPulse();
+                }
+            }
+
             HitFeedbackTick(dt);
 
             if (_hitFlash > 0f)
             {
                 _hitFlash -= dt;
-                ApplyTint(Color.Lerp(new Color(0.32f, 0.34f, 0.33f, 1f), new Color(0.95f, 0.86f, 0.80f, 1f), Mathf.Clamp01(_hitFlash / 0.12f)));
+                ApplyTint(Color.Lerp(_baseTint, new Color(0.95f, 0.86f, 0.80f, 1f), Mathf.Clamp01(_hitFlash / 0.12f)));
             }
         }
 
@@ -232,10 +258,100 @@ namespace MedusaHorror.Gameplay
             HitFeedbackFx();   // 受击反馈：白闪 / 命中粒子 / 短距击退抖动 / 音效叠层（不改变任何战斗数值）
 
 
+            if (!_phase2 && Health > 0f && Health01 <= phaseThreshold) EnterPhase2();
+
             if (_eye != null) _eye.intensity = 4.2f;
             var hitAudio = MedusaHorror.Core.AudioDirector.Instance;
             if (hitAudio != null) hitAudio.PlayAt(MedusaHorror.Core.SfxId.BossHit, transform.position, 0.8f, Random.Range(0.94f, 1.08f));
             if (Health <= 0f) Die();
+        }
+
+        /// <summary>血量过半：进入狂暴形态，提速、变紫、周期性石化脉冲。</summary>
+        void EnterPhase2()
+        {
+            _phase2 = true;
+            Phase = 2;
+            _pulseTimer = 0f;
+            huntSpeed *= phase2SpeedMul;
+            rageSpeed *= phase2SpeedMul;
+            _baseTint = new Color(0.42f, 0.20f, 0.34f, 1f);
+            ApplyTint(_baseTint);
+            if (_eye != null) _eye.color = new Color(1f, 0.35f, 0.55f);
+
+            MedusaHorror.UI.StoryBanner.Show("美杜莎 · 狂暴形态", "石化脉冲即将降临，别停下", 3.2f);
+            var audio = MedusaHorror.Core.AudioDirector.Instance;
+            if (audio != null) audio.PlayAt(MedusaHorror.Core.SfxId.BossRoar, transform.position, 1f, 0.82f);
+            Debug.Log("[Boss] 进入二阶段：狂暴形态");
+        }
+
+        /// <summary>二阶段范围石化：以 Boss 为圆心扩散一圈脉冲，命中玩家累积石化值。</summary>
+        void CastPetrifyPulse()
+        {
+            PulseCount++;
+            Vector3 c = transform.position;
+            SpawnPulseRing(c, pulseRadius);
+
+            var player = _player;
+            if (player == null) { ResolvePlayer(); player = _player; }
+            if (player != null)
+            {
+                float d = Vector3.Distance(player.position, c);
+                if (d <= pulseRadius)
+                {
+                    var pet = player.GetComponentInParent<MedusaHorror.Gameplay.PlayerPetrify>();
+                    if (pet != null && !pet.dead)
+                    {
+                        pet.value = Mathf.Min(pet.maxValue, pet.value + pulsePetrify);
+                        pet.lastRate = pulsePetrify;
+                    }
+                    var cs = FindObjectOfType<MedusaHorror.Player.CameraShake>();
+                    if (cs != null) cs.Shake(0.25f, 0.2f);
+                }
+            }
+
+            var audio = MedusaHorror.Core.AudioDirector.Instance;
+            if (audio != null) audio.PlayAt(MedusaHorror.Core.SfxId.PetrifyBreak, c, 0.85f, 0.75f);
+        }
+
+        void SpawnPulseRing(Vector3 pos, float radius)
+        {
+            var go = new GameObject("BossPulseRing");
+            go.transform.position = pos + Vector3.up * 0.6f;
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace = false;
+            lr.loop = true;
+            lr.positionCount = 64;
+            lr.material = new Material(Shader.Find("Sprites/Default"));
+            var col = new Color(0.95f, 0.35f, 0.65f, 0.9f);
+            lr.startColor = col;
+            lr.endColor = col;
+            lr.startWidth = 0.35f;
+            lr.endWidth = 0.12f;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            StartCoroutine(AnimatePulse(go, lr, radius, col, 0.55f));
+        }
+
+        System.Collections.IEnumerator AnimatePulse(GameObject go, LineRenderer lr, float radius, Color color, float duration)
+        {
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / duration);
+                float r = Mathf.Lerp(0.8f, radius, Mathf.SmoothStep(0f, 1f, k));
+                for (int i = 0; i < 64; i++)
+                {
+                    float a = i / 64f * Mathf.PI * 2f;
+                    lr.SetPosition(i, new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
+                }
+                var c = color;
+                c.a *= (1f - k);
+                lr.startColor = c;
+                lr.endColor = c;
+                yield return null;
+            }
+            Destroy(go);
         }
 
         void LateUpdate()
@@ -352,6 +468,18 @@ namespace MedusaHorror.Gameplay
             Health = maxHealth;
             _wakeTimer = 0f;
             Current = State.Dormant;
+            if (_phase2)
+            {
+                _phase2 = false;
+                Phase = 1;
+                huntSpeed /= phase2SpeedMul;
+                rageSpeed /= phase2SpeedMul;
+                _baseTint = new Color(0.32f, 0.34f, 0.33f, 1f);
+                ApplyTint(_baseTint);
+                if (_eye != null) _eye.color = new Color(1f, 0.55f, 0.30f);
+            }
+            _pulseTimer = 0f;
+            PulseCount = 0;
             if (_gaze != null) _gaze.enabled = false;
             if (_cc != null) _cc.enabled = true;
             gameObject.SetActive(true);
