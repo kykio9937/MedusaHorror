@@ -25,6 +25,12 @@ namespace MedusaHorror.Player
         public float acceleration = 16f;
         public float deceleration = 20f;
 
+        [Header("外部状态（坐骑等）")]
+        [Tooltip("为真时跳过重力与跳跃，高度由外部系统控制")]
+        public bool suspended;
+        [Tooltip("外部系统施加的移速倍率（坐骑等），1 表示不干预")]
+        public float externalSpeedScale = 1f;
+
         [Header("转身")]
         [Tooltip("鼠标水平转身的平滑时间，越小越跟手")]
         public float turnSmoothTime = 0.06f;
@@ -137,7 +143,7 @@ namespace MedusaHorror.Player
             {
                 // 半石化（>=70%）移动减速，玩家能直观感到"身体在僵硬"
                 float petrifyScale = (_petrify != null && _petrify.IsHalfPetrified) ? 0.6f : 1f;
-                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier * petrifyScale;
+                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier * petrifyScale * externalSpeedScale;
             }
 
             float rate = _planarSpeed < targetSpeed ? acceleration : deceleration;
@@ -153,6 +159,16 @@ namespace MedusaHorror.Player
 
             bool grounded = _cc.isGrounded;
             if (grounded) { _lastGroundedTime = Time.time; _airJumpsUsed = 0; }
+
+            // 骑乘等外部接管状态：不做重力与跳跃，高度由外部系统维持
+            if (suspended)
+            {
+                _verticalVelocity = 0f;
+                Vector3 flat = direction * _planarSpeed;
+                _cc.Move(flat * Time.deltaTime);
+                UpdateAnimator();
+                return;
+            }
 
             if (grounded && _verticalVelocity < 0f) _verticalVelocity = groundStickVelocity;
 
@@ -206,10 +222,12 @@ namespace MedusaHorror.Player
             // 用控制器实测速度驱动混合树，撞墙时会自动把速度压下来
             Vector3 v = _cc.velocity;
             float planar = new Vector2(v.x, v.z).magnitude;
+            // 骑乘时实际速度远超跑步阈值，钳到跑步上限避免混合树飞出
+            if (suspended) planar = Mathf.Min(planar, runSpeed);
             _animSpeed = Mathf.SmoothDamp(_animSpeed, planar, ref _animSpeedVelocity, animationSpeedDamp);
 
             if (_hasSpeedParam) _anim.SetFloat(speedParam, _animSpeed);
-            if (_hasGroundedParam) _anim.SetBool(groundedParam, _cc.isGrounded);
+            if (_hasGroundedParam) _anim.SetBool(groundedParam, suspended || _cc.isGrounded);
         }
     }
 }

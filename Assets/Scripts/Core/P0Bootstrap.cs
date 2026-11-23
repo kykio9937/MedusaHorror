@@ -113,6 +113,10 @@ namespace MedusaHorror.Core
             if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Player.PlayerSkin>() == null)
                 pcSkin.gameObject.AddComponent<MedusaHorror.Player.PlayerSkin>();
 
+            // 赛博摩托坐骑（等级 8 解锁，G 键召唤）
+            if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Gameplay.MountSystem>() == null)
+                pcSkin.gameObject.AddComponent<MedusaHorror.Gameplay.MountSystem>();
+
             // 等级 / 经验：老存档按等级补齐解锁，HUD 常驻左下角
             Progression.SyncUnlocks();
             var expHud = ExpHud.Ensure();

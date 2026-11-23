@@ -326,7 +326,14 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 11476850, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11412760, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11439238, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11467876, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11455652, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11486320, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
+    - {fileID: 11426478, guid: 144bd2e11bf4fbf45aeb44c922ef5508, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -2680,7 +2687,14 @@ PrefabInstance:
       propertyPath: m_ReflectionProbeUsage
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 11484338, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 11421702, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 114000012489719682, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 114000011994869716, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 114548457107044400, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 114000011944057930, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
+    - {fileID: 114000013123611444, guid: d9c0a43cf327eaa4989036273cdcc5c5, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -3602,7 +3616,17 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 114000013285492494, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000010789931790, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000011355558102, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000011392433778, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000013364708662, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000012490257190, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000012991384572, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000011223717730, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000010643678960, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
+    - {fileID: 114000013690413476, guid: c5a7a7b260898e44b94a625f39e4e681, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -3617,7 +3641,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1239046870}
   - component: {fileID: 1239046869}
-  - component: {fileID: 1239046868}
   m_Layer: 0
   m_Name: Planet
   m_TagString: Untagged
@@ -3625,23 +3648,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1239046868
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1239046867}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cf346e21ef0395b4298b0cfe017d32cf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Player: {fileID: 0}
-  x: -180
-  y: 150
-  z: 400
-  LookAtPlayer: 1
 --- !u!212 &1239046869
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -9925,7 +9931,8 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 114000012982584052, guid: 12f3d2a4e6d0c14439353497cc5594e7, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10255,10 +10262,6 @@ GameObject:
   - component: {fileID: 1810552385}
   - component: {fileID: 1810552384}
   - component: {fileID: 1810552383}
-  - component: {fileID: 1810552382}
-  - component: {fileID: 1810552381}
-  - component: {fileID: 1810552380}
-  - component: {fileID: 1810552379}
   m_Layer: 0
   m_Name: ballShip
   m_TagString: Untagged
@@ -10266,88 +10269,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1810552379
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1810552378}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 352d94e2dfe064249b3beff32ca8218c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  rb: {fileID: 1810552384}
-  x: 0
-  y: 0
-  z: -5
---- !u!114 &1810552380
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1810552378}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 84eca3db8dbc8d542bbfd1f943af370d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  MaxEnginePower: 400
-  RollEffect: 0.5
-  PitchEffect: 150
-  YawEffect: 3
-  BankedTurnEffect: 3
-  AutoTurnPitch: 0
-  AutoRollLevel: 0
-  AutoPitchLevel: 0
-  AirBreaksEffect: 30
-  ThrottleChangeSpeed: 1
-  DragIncreaseFactor: 0.001
-  turningAmmount: 40
-  spaceRotAmmount: 1
-  shipRayOffset: -3
-  camDist: 20
-  shipReflProbes: {fileID: 0}
-  hyperDriveEnginePower: 3000
-  MaxEnginePowerVar: 400
-  starDust: {fileID: 0}
-  landed: 0
-  mouseControled: 1
-  isUsingReflProbes: 0
-  canControl: 0
-  enginesParticles:
-  - {fileID: 1412659244}
-  dockedCar: {fileID: 0}
---- !u!114 &1810552381
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1810552378}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e2e7018bc0b91ec4b8e19059b707972c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &1810552382
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1810552378}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4c1c40d95293a89488b755dbe5d2d1bd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  enginePitch: 0
-  maxPitch: 2.5
-  minPitch: 1
-  EngineStarted: 0
 --- !u!82 &1810552383
 AudioSource:
   m_ObjectHideFlags: 0
@@ -11231,7 +11152,12 @@ PrefabInstance:
       propertyPath: m_AutoBraking
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 114000014210151970, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000012508003162, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000011448586510, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000012149854406, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000010070037302, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12538,7 +12464,8 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 114000010666627152, guid: dd192d620b6ef6841b4281e91b45078a, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12929,7 +12856,12 @@ PrefabInstance:
       propertyPath: m_AutoBraking
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 114000014210151970, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000012508003162, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000011448586510, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000012149854406, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
+    - {fileID: 114000010070037302, guid: d8e1e39f39f6c3b4a84850f510c150aa, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

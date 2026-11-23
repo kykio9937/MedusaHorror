@@ -206,7 +206,11 @@ public static class W1Pump
 
 
 
-            if (_logErr.Count < 200) _logErr.Add(msg);
+            // 编辑器 UI 层噪声（Package Manager 等）不计入游戏运行时错误
+            bool editorNoise = msg != null && (msg.Contains("Package Manager Window")
+                || msg.Contains("UnityEditor.PackageManager")
+                || msg.Contains("has no receiver"));   // 素材包动画事件没人接收，属无害提示
+            if (!editorNoise && _logErr.Count < 200) _logErr.Add(msg);
 
 
 
@@ -230,7 +234,9 @@ public static class W1Pump
 
 
 
-            if (_logWarn.Count < 200) _logWarn.Add(msg);
+            bool assetNoise = msg != null && (msg.Contains("does not support negative scale")
+                || msg.Contains("effective box size has been forced positive"));
+            if (!assetNoise && _logWarn.Count < 200) _logWarn.Add(msg);
 
 
 
@@ -1900,6 +1906,12 @@ public static class W1Pump
         if (op == "LOADSCENE") return LoadSceneCmd(parts.Length > 1 ? parts[1] : "MainMenu");
         if (op == "TREE") return MedusaHorror.EditorTools.SceneRestore.Tree(parts.Length > 1 ? parts[1].Trim() : "");
         if (op == "SCRIPTLIST") return ScriptList(parts.Length > 1 ? parts[1].Trim() : "");
+        if (op == "STRIPPKG")
+        {
+            var sp = _lastCmd.Split('|');
+            if (sp.Length < 2) return "[STRIPPKG] 用法 STRIPPKG|场景路径";
+            return MedusaHorror.EditorTools.SceneRestore.StripPackageScripts(sp[1].Trim());
+        }
         if (op == "INVFLOOR")
         {
             var iv = _lastCmd.Split('|');
@@ -1913,9 +1925,43 @@ public static class W1Pump
             if (nt.Length < 3) return "[NOCLIPTYPE] 用法 NOCLIPTYPE|场景|类型名";
             return MedusaHorror.EditorTools.SceneRestore.StripColliderType(nt[1].Trim(), nt[2].Trim());
         }
-        if (op == "WALKMAP")
+        if (op == "MOUNTINSPECT")
         {
-            var wm = _lastCmd.Split('|');
+            var mi = _lastCmd.Split('|');
+            return MedusaHorror.EditorTools.MountBuilder.Inspect(mi.Length > 1 ? mi[1].Trim() : null);
+        }
+        if (op == "MOUNTBUILD")
+        {
+            var mb = _lastCmd.Split('|');
+            return MedusaHorror.EditorTools.MountBuilder.Build(mb.Length > 1 ? mb[1].Trim() : null);
+        }
+        if (op == "MOUNT")
+        {
+            var ms = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MountSystem>(true);
+            if (ms == null) return "[MOUNT] 未找到 MountSystem";
+            bool ok = ms.Toggle();
+            return "[MOUNT] ok=" + ok + " riding=" + ms.IsRiding + " reason=" + ms.LastBlockReason;
+        }
+        if (op == "MOUNTDIAG")
+        {
+            var ms = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MountSystem>(true);
+            if (ms == null) return "[MOUNTDIAG] null";
+            var prefab = Resources.Load<GameObject>(ms.prefabResource);
+            var bike = GameObject.Find("HoverBike");
+            var tpc = ms.GetComponent<MedusaHorror.Player.ThirdPersonController>();
+            var cc = ms.GetComponent<CharacterController>();
+            string vel = "n/a", sus = "n/a", scale = "n/a";
+            if (cc != null) { var v = cc.velocity; vel = new Vector2(v.x, v.z).magnitude.ToString("F2"); }
+            if (tpc != null) { sus = tpc.suspended.ToString(); scale = tpc.externalSpeedScale.ToString("F2"); }
+            return "[MOUNTDIAG] unlocked=" + ms.Unlocked + " riding=" + ms.IsRiding
+                + " summons=" + ms.SummonCount + " prefab=" + (prefab != null)
+                + " bike=" + (bike != null) + " reason=" + ms.LastBlockReason
+                + " lv=" + MedusaHorror.Core.Progression.Level
+                + " suspended=" + sus + " speedScale=" + scale + " planar=" + vel
+                + " playerY=" + ms.transform.position.y.ToString("F2");
+        }
+        if (op == "WALKMAP")
+        {            var wm = _lastCmd.Split('|');
             if (wm.Length < 7) return "[WALKMAP] 用法 WALKMAP|场景|cell|x0|z0|x1|z1";
             float W(int i) { return float.Parse(wm[i].Trim(), CultureInfo.InvariantCulture); }
             return MedusaHorror.EditorTools.SceneRestore.WalkMap(wm[1].Trim(), W(2), W(3), W(4), W(5), W(6));

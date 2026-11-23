@@ -827,5 +827,40 @@ namespace MedusaHorror.EditorTools
             foreach (var r in refScene.GetRootGameObjects()) sb.Append(r.name).Append(" | ");
             return sb.ToString();
         }
+
+        /// <summary>
+        /// 删除素材包自带的运行时脚本（Space / Standard Assets）。
+        /// 这些物件在本项目里只是布景，自带的 Hover/SpaceShipControl/lookAt 会读未配置的输入轴并抛空引用。
+        /// </summary>
+        public static string StripPackageScripts(string levelPath)
+        {
+            if (EditorApplication.isPlaying) return "[STRIPPKG] 播放中拒绝";
+            if (!System.IO.File.Exists(levelPath)) return "[STRIPPKG] 不存在: " + levelPath;
+
+            var sc = EditorSceneManager.OpenScene(levelPath, OpenSceneMode.Single);
+            int n = 0;
+            var roots = sc.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                var all = roots[i].GetComponentsInChildren<MonoBehaviour>(true);
+                for (int j = 0; j < all.Length; j++)
+                {
+                    var mb = all[j];
+                    if (mb == null) continue;
+                    var ms = MonoScript.FromMonoBehaviour(mb);
+                    if (ms == null) continue;
+                    string p = AssetDatabase.GetAssetPath(ms);
+                    if (string.IsNullOrEmpty(p)) continue;
+                    if (p.StartsWith("Assets/Space/") || p.StartsWith("Assets/Standard Assets/"))
+                    {
+                        Object.DestroyImmediate(mb);
+                        n++;
+                    }
+                }
+            }
+            EditorSceneManager.MarkSceneDirty(sc);
+            bool ok = EditorSceneManager.SaveScene(sc);
+            return "[STRIPPKG] scene=" + sc.name + " removed=" + n + " saved=" + ok;
+        }
     }
 }
