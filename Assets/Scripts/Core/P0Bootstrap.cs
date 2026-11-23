@@ -117,6 +117,12 @@ namespace MedusaHorror.Core
             if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Gameplay.MountSystem>() == null)
                 pcSkin.gameObject.AddComponent<MedusaHorror.Gameplay.MountSystem>();
 
+            // 主动技能：F 裂空斩（10 级）/ V 石化震荡（12 级），HUD 右下角常驻
+            if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Gameplay.ActiveSkill>() == null)
+                pcSkin.gameObject.AddComponent<MedusaHorror.Gameplay.ActiveSkill>();
+            var skillHud = MedusaHorror.UI.SkillHud.Ensure();
+            skillHud.SetShown(!inMenu);
+
             // 等级 / 经验：老存档按等级补齐解锁，HUD 常驻左下角
             Progression.SyncUnlocks();
             var expHud = ExpHud.Ensure();

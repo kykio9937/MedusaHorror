@@ -2604,6 +2604,23 @@ public static class W1Pump
             MedusaHorror.Player.WeaponLoadout.debugSwitchTo = k;
             return "[SWITCH] queued=" + k;
         }
+        if (op == "SKILL")
+        {
+            int si = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 1;
+            var sk = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.ActiveSkill>(true);
+            if (sk == null) return "[SKILL] no skill";
+            bool ok = si == 2 ? sk.TryShock() : sk.TrySlash();
+            return "[SKILL] cast=" + si + " ok=" + ok + " casts=" + sk.CastCount + " last=" + sk.LastCastName
+                + " slashCd=" + sk.SlashRemain.ToString("F1") + " shockCd=" + sk.ShockRemain.ToString("F1");
+        }
+        if (op == "SKILLDIAG")
+        {
+            var sk = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.ActiveSkill>(true);
+            if (sk == null) return "[SKILLDIAG] no skill";
+            return "[SKILLDIAG] slashUnlocked=" + sk.SlashUnlocked + " slashReady=" + sk.SlashReady
+                + " shockUnlocked=" + sk.ShockUnlocked + " shockReady=" + sk.ShockReady
+                + " casts=" + sk.CastCount + " last=" + sk.LastCastName;
+        }
         if (op == "RIFLEFIRE")
         {
             var wlf = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.WeaponLoadout>(true);

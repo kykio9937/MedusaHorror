@@ -67,6 +67,15 @@ namespace MedusaHorror.Player
         /// <summary>本帧是否按下武器切换键（Q）。</summary>
         public bool SwitchWeaponPressed { get; private set; }
 
+        /// <summary>本帧是否按下主动技能 1（F）。</summary>
+        public bool Skill1Pressed { get; private set; }
+
+        /// <summary>本帧是否按下主动技能 2（V）。</summary>
+        public bool Skill2Pressed { get; private set; }
+
+        /// <summary>一次性技能脉冲：-1 无效，0 技能1，1 技能2（编辑器诊断命令用，读取后清零）。</summary>
+        public static int debugSkillPulse = -1;
+
         /// <summary>一次性切武器脉冲：-1 无效，0 切剑，1 切枪（编辑器诊断命令用，读取后清零）。</summary>
         public static int debugSwitchPulse = -1;
 
@@ -101,6 +110,8 @@ namespace MedusaHorror.Player
             bool w2 = false;
             bool w3 = false;
             bool swap = false;
+            bool sk1 = false;
+            bool sk2 = false;
             bool ready = false;
 
             if (debugOverrideEnabled)
@@ -112,6 +123,8 @@ namespace MedusaHorror.Player
                 interact = debugInteractPulse;
                 if (debugSwitchPulse == 0) { w1 = true; swap = true; }
                 else if (debugSwitchPulse == 1) { w2 = true; swap = true; }
+                if (debugSkillPulse == 0) { sk1 = true; debugSkillPulse = -1; }
+                else if (debugSkillPulse == 1) { sk2 = true; debugSkillPulse = -1; }
                 ready = true;
             }
             else
@@ -135,6 +148,8 @@ namespace MedusaHorror.Player
                 w2 = kb.digit2Key.wasPressedThisFrame;
                 w3 = kb.digit3Key.wasPressedThisFrame;
                 swap = kb.qKey.wasPressedThisFrame;
+                sk1 = kb.fKey.wasPressedThisFrame;
+                sk2 = kb.vKey.wasPressedThisFrame;
 
                 if (kb.escapeKey.wasPressedThisFrame) LockCursor(false);
             }
@@ -159,6 +174,7 @@ namespace MedusaHorror.Player
                 move = Vector2.zero;
                 look = Vector2.zero;
                 run = jump = interact = fire = reload = w1 = w2 = w3 = swap = false;
+                sk1 = sk2 = false;
             }
 
             if (move.sqrMagnitude > 1f) move.Normalize();
@@ -174,6 +190,8 @@ namespace MedusaHorror.Player
             Weapon2Pressed = w2;
             Weapon3Pressed = w3;
             SwitchWeaponPressed = swap;
+            Skill1Pressed = sk1;
+            Skill2Pressed = sk2;
             debugSwitchPulse = -1;
             debugReloadPulse = false;
             debugInteractPulse = false;
