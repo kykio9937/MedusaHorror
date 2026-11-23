@@ -181,7 +181,7 @@ namespace MedusaHorror.Core
             shakeTimer = 1.1f;
 
             titleText.text = string.IsNullOrEmpty(title) ? "你被石化了" : title;
-            subText.text = subtitle ?? string.Empty;
+            subText.text = BuildFailStats(subtitle);
             hintText.text = "按 R 重新开始　·　按 Q 退出游戏";
             ConfigureButtons("重新开始 (R)", Restart, "退出游戏 (Q)", QuitGame);
             ConfigureThird(null, null, false);
@@ -189,7 +189,40 @@ namespace MedusaHorror.Core
             FreezePlayer();
             CaptureLensTargets();
             ShowCursor();
+
+            var audio = AudioDirector.Instance;
+            if (audio != null)
+            {
+                audio.SetBattleMusic(false);
+                audio.Play(SfxId.PetrifyBreak, 0.9f, 0.62f);
+            }
             Debug.Log("[GameFlow] 失败：" + titleText.text);
+        }
+
+        /// <summary>失败结算文案：关卡 / 存活时间 / 击杀 / 等级 / 信用点。</summary>
+        string BuildFailStats(string subtitle)
+        {
+            var d = SaveSystem.Data;
+            int secs = Mathf.Max(0, Mathf.RoundToInt(d.playSeconds));
+            string time = (secs / 60).ToString("00") + ":" + (secs % 60).ToString("00");
+            string scene = PrettyScene(SceneManager.GetActiveScene().name);
+            string head = string.IsNullOrEmpty(subtitle) ? "" : subtitle + (char)10;
+            return head
+                + "关卡 " + scene + "　·　存活 " + time
+                + (char)10 + "击杀 " + d.killCount + "　·　等级 " + d.level + "　·　信用点 " + d.coins;
+        }
+
+        static string PrettyScene(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "-";
+            if (name.StartsWith("W0")) return "基地";
+            if (name.StartsWith("W1")) return "废弃医院";
+            if (name.StartsWith("W2")) return "荒原";
+            if (name.StartsWith("W3")) return "地下铁";
+            if (name.StartsWith("W4")) return "霓虹街区";
+            if (name.StartsWith("W5")) return "外星星门";
+            if (name == "MainMenu") return "主菜单";
+            return name;
         }
 
         // ---------------- 胜利 ----------------

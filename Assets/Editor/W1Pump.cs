@@ -2604,6 +2604,21 @@ public static class W1Pump
             MedusaHorror.Player.WeaponLoadout.debugSwitchTo = k;
             return "[SWITCH] queued=" + k;
         }
+        if (op == "KILLPLAYER")
+        {
+            var pet = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.PlayerPetrify>(true);
+            if (pet == null) return "[KILLPLAYER] no petrify";
+            pet.value = pet.maxValue;
+            pet.dead = true;
+            pet.SendMessage("TriggerDeath", UnityEngine.SendMessageOptions.DontRequireReceiver);
+            return "[KILLPLAYER] dead=" + pet.Dead + " value=" + pet.value;
+        }
+        if (op == "FAILDIAG")
+        {
+            var gf = MedusaHorror.Core.GameFlow.Instance;
+            if (gf == null) return "[FAILDIAG] no gameflow";
+            return "[FAILDIAG] state=" + gf.State + " running=" + gf.IsRunning + " panel=" + gf.Panel;
+        }
         if (op == "BOSSPHASE")
         {
             var b = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.MedusaBoss>(true);
