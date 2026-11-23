@@ -183,6 +183,16 @@ namespace MedusaHorror.UI
                 }
                 if (_barFill != null) _barFill.color = new Color(0.82f, 0.78f, 0.45f, 1f);
             }
+            else if (kind == WeaponKind.Rifle)
+            {
+                WeaponLabel = "脉冲步枪 · MK-II";
+                if (_weaponText != null)
+                {
+                    _weaponText.text = WeaponLabel;
+                    _weaponText.color = new Color(0.72f, 0.96f, 1f, 0.98f);
+                }
+                if (_barFill != null) _barFill.color = new Color(0.30f, 0.92f, 1f, 1f);
+            }
             else
             {
                 WeaponLabel = "手枪 · M1911";

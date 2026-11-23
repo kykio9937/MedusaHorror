@@ -61,6 +61,8 @@ namespace MedusaHorror.Player
 
         /// <summary>本帧是否按下切枪键（数字 2）。</summary>
         public bool Weapon2Pressed { get; private set; }
+        /// <summary>数字键 3：脉冲步枪（等级 5 解锁）。</summary>
+        public bool Weapon3Pressed { get; private set; }
 
         /// <summary>本帧是否按下武器切换键（Q）。</summary>
         public bool SwitchWeaponPressed { get; private set; }
@@ -97,6 +99,7 @@ namespace MedusaHorror.Player
             bool reload = false;
             bool w1 = false;
             bool w2 = false;
+            bool w3 = false;
             bool swap = false;
             bool ready = false;
 
@@ -130,6 +133,7 @@ namespace MedusaHorror.Player
                 reload = kb.rKey.wasPressedThisFrame;
                 w1 = kb.digit1Key.wasPressedThisFrame;
                 w2 = kb.digit2Key.wasPressedThisFrame;
+                w3 = kb.digit3Key.wasPressedThisFrame;
                 swap = kb.qKey.wasPressedThisFrame;
 
                 if (kb.escapeKey.wasPressedThisFrame) LockCursor(false);
@@ -154,7 +158,7 @@ namespace MedusaHorror.Player
             {
                 move = Vector2.zero;
                 look = Vector2.zero;
-                run = jump = interact = fire = reload = w1 = w2 = swap = false;
+                run = jump = interact = fire = reload = w1 = w2 = w3 = swap = false;
             }
 
             if (move.sqrMagnitude > 1f) move.Normalize();
@@ -168,6 +172,7 @@ namespace MedusaHorror.Player
             ReloadPressed = reload;
             Weapon1Pressed = w1;
             Weapon2Pressed = w2;
+            Weapon3Pressed = w3;
             SwitchWeaponPressed = swap;
             debugSwitchPulse = -1;
             debugReloadPulse = false;

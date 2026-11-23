@@ -2598,6 +2598,46 @@ public static class W1Pump
             return "[NPCVAR] count=" + vs.Length + " | " + sb.ToString()
                 + "| skin=" + (ps == null ? "none" : ps.SkinName);
         }
+        if (op == "SWITCH")
+        {
+            int k = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+            MedusaHorror.Player.WeaponLoadout.debugSwitchTo = k;
+            return "[SWITCH] queued=" + k;
+        }
+        if (op == "RIFLEFIRE")
+        {
+            var wlf = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.WeaponLoadout>(true);
+            if (wlf == null || wlf.rifle == null) return "[RIFLEFIRE] no rifle";
+            int n = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 3;
+            for (int i = 0; i < n; i++) wlf.rifle.DebugFireOnce();
+            var ir = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.InputReader>(true);
+            return "[RIFLEFIRE] n=" + n + " mag=" + wlf.rifle.AmmoInMagazine + " shots=" + wlf.rifle.ShotsFired
+                + " lastHit=" + wlf.rifle.LastHitName + " firePressed=" + (ir != null && ir.FirePressed)
+                + " debugFire=" + MedusaHorror.Player.InputReader.debugFire;
+        }
+        if (op == "UNLOCKGUN")
+        {
+            var wlu = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.WeaponLoadout>(true);
+            if (wlu == null) return "[UNLOCKGUN] no loadout";
+            wlu.UnlockGun("测试解锁");
+            return "[UNLOCKGUN] gunUnlocked=" + wlu.GunUnlocked;
+        }
+        if (op == "RIFLEDIAG")
+        {
+            var wl = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.WeaponLoadout>(true);
+            if (wl == null) return "[RIFLEDIAG] no loadout";
+            var r = wl.rifle;
+            return "[RIFLEDIAG] current=" + wl.Current + " rifle=" + (r != null)
+                + " pulse=" + MedusaHorror.Core.Progression.Has("pulse")
+                + " gunUnlocked=" + wl.GunUnlocked
+                + " dmg=" + (r != null ? r.damage.ToString("F0") : "-")
+                + " mag=" + (r != null ? (r.AmmoInMagazine + "/" + r.MagazineSize) : "-")
+                + " active=" + (r != null && r.inputEnabled)
+                + " inputBound=" + (r != null && r.InputBound)
+                + " cursorLocked=" + (r != null && r.CursorLocked)
+                + " shots=" + (r != null ? r.ShotsFired : -1)
+                + " switches=" + wl.SwitchCount + " blocked=" + wl.BlockedSwitches;
+        }
         if (op == "COMBO")
         {
             var mw = UnityEngine.Object.FindObjectOfType<MedusaHorror.Player.MeleeWeapon>(true);
@@ -11572,6 +11612,7 @@ public static class W1Pump
 
 
             MedusaHorror.Player.InputReader.debugFire = on;
+            if (on) UnityEngine.Cursor.lockState = UnityEngine.CursorLockMode.Locked;
 
 
 

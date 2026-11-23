@@ -50,6 +50,15 @@ namespace MedusaHorror.Player
         public float spreadRecoverPerSecond = 4.0f;
 
         [Header("引用")]
+        [Header("外观（用于区分不同枪型）")]
+        public float bodyLength = 0.30f;
+        public float bodyHeight = 0.11f;
+        public float bodyWidth = 0.07f;
+        public Color bodyColor = new Color(0.10f, 0.10f, 0.11f, 1f);
+        public Color gripColor = new Color(0.06f, 0.06f, 0.07f, 1f);
+        public bool emissive = false;
+        public Color emissiveColor = new Color(0.2f, 0.9f, 1f, 1f);
+
         public Camera viewCamera;
 
         [Header("开关")]
@@ -82,6 +91,10 @@ namespace MedusaHorror.Player
         public bool IsReloading { get { return _reloadElapsed >= 0f; } }
         public float SpreadDegrees { get { return _spread; } }
         public int ShotsFired { get; private set; }
+        public bool InputBound { get { return _input != null; } }
+        public bool CursorLocked { get { return Cursor.lockState == CursorLockMode.Locked; } }
+        /// <summary>测试钩子：绕过输入与光标判定直接开一枪。</summary>
+        public void DebugFireOnce() { TryFire(); }
         public int ReloadsCompleted { get; private set; }
         public float LastReloadSeconds { get; private set; }
         public float RecoilApplied { get { return _camInput != null ? _camInput.RecoilDegrees : -1f; } }
@@ -94,6 +107,7 @@ namespace MedusaHorror.Player
         void Start()
         {
             _input = GetComponent<InputReader>();
+            if (_input == null) _input = GetComponentInParent<InputReader>();
             if (viewCamera == null) viewCamera = Camera.main;
             magazineSize += MedusaHorror.Core.Progression.LevelMagBonus;   // 等级解锁的弹匣扩容
             _ammo = magazineSize;
@@ -111,9 +125,9 @@ namespace MedusaHorror.Player
             var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
             body.name = "Pistol_Body";
             body.transform.SetParent(holder.transform, false);
-            body.transform.localScale = new Vector3(0.07f, 0.11f, 0.30f);
+            body.transform.localScale = new Vector3(bodyWidth, bodyHeight, bodyLength);
             KillCollider(body);
-            Paint(body, new Color(0.10f, 0.10f, 0.11f, 1f));
+            Paint(body, bodyColor);
 
             var grip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             grip.name = "Pistol_Grip";
@@ -121,11 +135,11 @@ namespace MedusaHorror.Player
             grip.transform.localPosition = new Vector3(0f, -0.11f, -0.08f);
             grip.transform.localScale = new Vector3(0.06f, 0.14f, 0.09f);
             KillCollider(grip);
-            Paint(grip, new Color(0.06f, 0.06f, 0.07f, 1f));
+            Paint(grip, gripColor);
 
             var muzzleGo = new GameObject("Muzzle");
             muzzleGo.transform.SetParent(holder.transform, false);
-            muzzleGo.transform.localPosition = new Vector3(0f, 0.01f, 0.17f);
+            muzzleGo.transform.localPosition = new Vector3(0f, 0.01f, bodyLength * 0.57f);
             _muzzle = muzzleGo.transform;
 
             _flash = muzzleGo.AddComponent<Light>();
@@ -150,6 +164,11 @@ namespace MedusaHorror.Player
             var m = new Material(Shader.Find("Standard"));
             m.color = c;
             if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", 0.35f);
+            if (emissive && m.HasProperty("_EmissionColor"))
+            {
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", emissiveColor * 1.4f);
+            }
             r.sharedMaterial = m;
         }
 

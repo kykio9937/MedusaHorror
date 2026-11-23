@@ -8,7 +8,9 @@ namespace MedusaHorror.Player
     public enum WeaponKind
     {
         Sword = 0,
-        Gun = 1
+        Gun = 1,
+        /// <summary>脉冲步枪：等级 5 解锁的第三把武器。</summary>
+        Rifle = 2
     }
 
     /// <summary>
@@ -22,6 +24,8 @@ namespace MedusaHorror.Player
     {
         public MeleeWeapon sword;
         public PlayerWeapon gun;
+        [Tooltip("脉冲步枪（等级 5 解锁），留空则运行时自动创建")]
+        public PlayerWeapon rifle;
         public InputReader input;
         public WeaponHud hud;
         public WeaponKind startWeapon = WeaponKind.Sword;
@@ -59,6 +63,7 @@ namespace MedusaHorror.Player
             if (sword == null) sword = GetComponent<MeleeWeapon>();
             if (gun == null) gun = GetComponent<PlayerWeapon>();
             if (hud == null) hud = GetComponent<WeaponHud>();
+            EnsureRifle();
             if (LastSwitchSource == null) LastSwitchSource = "初始化";
         }
 
@@ -81,7 +86,38 @@ namespace MedusaHorror.Player
                 hud = GetComponent<WeaponHud>();
                 if (hud == null) hud = GetComponentInChildren<WeaponHud>(true);
             }
+            EnsureRifle();
             if (LastSwitchSource == null) LastSwitchSource = "初始化";
+        }
+
+        /// <summary>运行时创建脉冲步枪：独立枪模、独立弹道参数，与手枪共用输入。</summary>
+        void EnsureRifle()
+        {
+            if (rifle != null) return;
+            var go = new GameObject("PulseRifle");
+            go.transform.SetParent(transform, false);
+            var w = go.AddComponent<PlayerWeapon>();
+            w.damage = 24f;
+            w.roundsPerSecond = 8.5f;
+            w.magazineSize = 30;
+            w.reserveAmmo = 300;
+            w.reloadTime = 1.9f;
+            w.range = 90f;
+            w.spreadBase = 0.55f;
+            w.spreadPerShot = 0.42f;
+            w.spreadMax = 3.6f;
+            w.spreadRecoverPerSecond = 5.5f;
+            w.recoilPerShot = 0.9f;
+            w.aimHeight = 1.35f;
+            w.bodyLength = 0.46f;
+            w.bodyHeight = 0.10f;
+            w.bodyWidth = 0.075f;
+            w.bodyColor = new Color(0.12f, 0.16f, 0.22f, 1f);
+            w.gripColor = new Color(0.07f, 0.09f, 0.12f, 1f);
+            w.emissive = true;
+            w.emissiveColor = new Color(0.25f, 0.85f, 1f, 1f);
+            w.inputEnabled = false;
+            rifle = w;
         }
 
         void Start()
@@ -98,7 +134,8 @@ namespace MedusaHorror.Player
 
             if (debugSwitchTo >= 0)
             {
-                var k = debugSwitchTo == 0 ? WeaponKind.Sword : WeaponKind.Gun;
+                var k = debugSwitchTo == 0 ? WeaponKind.Sword
+                      : (debugSwitchTo == 2 ? WeaponKind.Rifle : WeaponKind.Gun);
                 debugSwitchTo = -1;
                 Equip(k, "诊断命令");
                 return;
@@ -122,6 +159,7 @@ namespace MedusaHorror.Player
             {
                 if (input.Weapon1Pressed) { HandlePress(1, "数字键 1"); return; }
                 if (input.Weapon2Pressed) { HandlePress(2, "数字键 2"); return; }
+                if (input.Weapon3Pressed) { HandlePress(3, "数字键 3"); return; }
             }
             if (useToggleKey && input.SwitchWeaponPressed) HandlePress(3, "Q 切换");
         }
@@ -140,10 +178,23 @@ namespace MedusaHorror.Player
                 case 2:
                     Equip(WeaponKind.Gun, source);
                     break;
+                case 3:
+                    Equip(WeaponKind.Rifle, source);
+                    break;
                 default:
-                    Equip(Current == WeaponKind.Sword ? WeaponKind.Gun : WeaponKind.Sword, source);
+                    Equip(NextWeapon(), source);
                     break;
             }
+        }
+
+        /// <summary>Q 键循环：剑 → 手枪 → 脉冲步枪 → 剑（未解锁的跳过）。</summary>
+        WeaponKind NextWeapon()
+        {
+            if (Current == WeaponKind.Sword)
+                return gunUnlocked ? WeaponKind.Gun : WeaponKind.Sword;
+            if (Current == WeaponKind.Gun)
+                return (gunUnlocked && Progression.Has("pulse")) ? WeaponKind.Rifle : WeaponKind.Sword;
+            return WeaponKind.Sword;
         }
 
         /// <summary>轮询 Boss 死亡状态，作为「关卡通过」信号自动解锁枪械。</summary>
@@ -176,7 +227,8 @@ namespace MedusaHorror.Player
         /// <summary>装备指定武器：显隐模型、切换输入开关、刷新 HUD。封锁态下枪的请求回落为剑。</summary>
         public void Equip(WeaponKind kind, string source = "切换")
         {
-            if (kind == WeaponKind.Gun && !gunUnlocked)
+            bool isFirearm = kind == WeaponKind.Gun || kind == WeaponKind.Rifle;
+            if (isFirearm && !gunUnlocked)
             {
                 BlockedSwitches++;
                 LastBlockedSource = source;
@@ -189,23 +241,36 @@ namespace MedusaHorror.Player
                 kind = WeaponKind.Sword;
                 source = source + "→回落剑";
             }
+            else if (kind == WeaponKind.Rifle && !Progression.Has("pulse"))
+            {
+                BlockedSwitches++;
+                LastBlockedSource = source;
+                if (Time.time - _lastToastTime > 2.5f)
+                {
+                    _lastToastTime = Time.time;
+                    LootToast.Show("脉冲步枪 · 等级 5 解锁");
+                }
+                kind = WeaponKind.Sword;
+                source = source + "→回落剑";
+            }
 
+            EnsureRifle();
             Current = kind;
             SwitchCount++;
             LastSwitchSource = source;
 
-            bool swordOn = kind == WeaponKind.Sword;
-            if (sword != null) sword.SetActiveState(swordOn);
-            if (gun != null) gun.SetActiveState(!swordOn);
+            if (sword != null) sword.SetActiveState(kind == WeaponKind.Sword);
+            if (gun != null) gun.SetActiveState(kind == WeaponKind.Gun);
+            if (rifle != null) rifle.SetActiveState(kind == WeaponKind.Rifle);
 
             if (hud != null)
             {
-                hud.SetWeapon(kind, this, sword, gun);
+                hud.SetWeapon(kind, this, sword, kind == WeaponKind.Rifle ? rifle : gun);
                 hud.SetHintText(gunUnlocked ? null : "1 剑 · 枪械已封存（击杀 Boss 解锁）");
             }
 
             var audio = AudioDirector.Instance;
-            if (audio != null) audio.Play(SfxId.WeaponSwitch, 0.55f, swordOn ? 1.06f : 0.94f);
+            if (audio != null) audio.Play(SfxId.WeaponSwitch, 0.55f, kind == WeaponKind.Sword ? 1.06f : 0.94f);
         }
     }
 }
