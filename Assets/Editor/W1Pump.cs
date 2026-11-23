@@ -2604,6 +2604,34 @@ public static class W1Pump
             MedusaHorror.Player.WeaponLoadout.debugSwitchTo = k;
             return "[SWITCH] queued=" + k;
         }
+        if (op == "DIALOGSTART")
+        {
+            var giver = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.NpcQuestGiver>(true);
+            if (giver == null) return "[DIALOGSTART] no npc";
+            giver.Interact();
+            var ds0 = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.DialogueSystem>(true);
+            return "[DIALOGSTART] open=" + MedusaHorror.Gameplay.DialogueSystem.IsOpen
+                + " speaker=" + (ds0 != null ? ds0.Speaker : "-")
+                + " line=" + (ds0 != null ? ds0.LineIndex + "/" + ds0.LineCount : "-");
+        }
+        if (op == "DIALOGNEXT")
+        {
+            var ds = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.DialogueSystem>(true);
+            if (ds == null) return "[DIALOGNEXT] no dialogue system";
+            int n = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 1;
+            for (int i = 0; i < n; i++) { if (!MedusaHorror.Gameplay.DialogueSystem.IsOpen) break; ds.DebugAdvance(); }
+            return "[DIALOGNEXT] n=" + n + " open=" + MedusaHorror.Gameplay.DialogueSystem.IsOpen
+                + " line=" + ds.LineIndex + "/" + ds.LineCount + " typed=" + ds.TypedText.Length;
+        }
+        if (op == "DIALOGDIAG")
+        {
+            var ds = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.DialogueSystem>(true);
+            if (ds == null) return "[DIALOGDIAG] none";
+            return "[DIALOGDIAG] open=" + MedusaHorror.Gameplay.DialogueSystem.IsOpen
+                + " speaker=" + (ds.Speaker ?? "-")
+                + " line=" + ds.LineIndex + "/" + ds.LineCount
+                + " text=" + (ds.TypedText ?? "");
+        }
         if (op == "SKILL")
         {
             int si = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 1;

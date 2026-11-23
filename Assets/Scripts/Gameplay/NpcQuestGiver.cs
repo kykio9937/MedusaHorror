@@ -68,6 +68,58 @@ namespace MedusaHorror.Gameplay
             var audio = AudioDirector.Instance;
             if (audio != null) audio.PlayAt(SfxId.UiClick, transform.position, 0.7f, 1f);
 
+            if (DialogueSystem.IsOpen) return;
+            DialogueSystem.Ensure().Play(def.npcName, BuildLines(), ResolveQuest);
+        }
+
+        /// <summary>按任务状态生成对白：未接 / 进行中 / 可交付 / 已交付。</summary>
+        string[] BuildLines()
+        {
+            if (QuestSystem.Claimed(def.id))
+            {
+                return new[]
+                {
+                    "「" + def.title + "」已经结了，谢了。",
+                    "前面还有更麻烦的东西，别掉以轻心。"
+                };
+            }
+            if (!QuestSystem.Accepted(def.id))
+            {
+                if (!QuestSystem.CanAccept(def.id))
+                {
+                    return new[]
+                    {
+                        "先完成「" + QuestSystem.RequiresTitle(def.id) + "」，再来找我。",
+                        "那件事不了结，我这边的门开不了。"
+                    };
+                }
+                return new[]
+                {
+                    "你看起来还能走，那就好。",
+                    def.desc,
+                    "「" + def.title + "」—— 帮我做这件事，报酬不会少。"
+                };
+            }
+            if (QuestSystem.Ready(def.id))
+            {
+                return new[]
+                {
+                    "你做到了？",
+                    "让我看看……嗯，「" + def.title + "」确实完成了。"
+                };
+            }
+            return new[]
+            {
+                "「" + def.title + "」还没完。",
+                "当前进度 " + QuestSystem.Progress(def.id) + "/" + def.need + "，别停。"
+            };
+        }
+
+        /// <summary>对话结束后执行实际的任务逻辑（接取 / 交付 / 查看进度）。</summary>
+        void ResolveQuest()
+        {
+            var audio = AudioDirector.Instance;
+
             if (!QuestSystem.Accepted(def.id))
             {
                 if (!QuestSystem.CanAccept(def.id))
