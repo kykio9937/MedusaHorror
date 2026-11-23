@@ -130,6 +130,9 @@ namespace MedusaHorror.Core
             // NPC 对话系统：常驻，按需弹出底部对话框
             MedusaHorror.Gameplay.DialogueSystem.Ensure();
 
+            // 成就系统：常驻轮询解锁条件，Tab 打开成就列表
+            MedusaHorror.Gameplay.AchievementSystem.Ensure();
+
             // 等级 / 经验：老存档按等级补齐解锁，HUD 常驻左下角
             Progression.SyncUnlocks();
             var expHud = ExpHud.Ensure();

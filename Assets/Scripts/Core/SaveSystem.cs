@@ -91,6 +91,10 @@ namespace MedusaHorror.Core
         public float damageBonus = 0f;
         public float petrifyResist = 0f;
 
+        [Header("成就")]
+        [Tooltip("已解锁的成就 id")]
+        public List<string> achievements = new List<string>();
+
         [Header("新手引导")]
         [Tooltip("W1 操作引导是否已播放过")]
         public bool tutorialDone = false;

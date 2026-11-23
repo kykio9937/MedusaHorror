@@ -2613,6 +2613,32 @@ public static class W1Pump
             pet.SendMessage("TriggerDeath", UnityEngine.SendMessageOptions.DontRequireReceiver);
             return "[KILLPLAYER] dead=" + pet.Dead + " value=" + pet.value;
         }
+        if (op == "ACHIEVE")
+        {
+            var ac = MedusaHorror.Gameplay.AchievementSystem.Instance;
+            if (ac == null) return "[ACHIEVE] none";
+            if (parts.Length > 1)
+            {
+                bool got = ac.Unlock(parts[1]);
+                return "[ACHIEVE] unlock=" + parts[1] + " new=" + got + " total=" + ac.UnlockedCount;
+            }
+            return "[ACHIEVE] total=" + ac.UnlockedCount + "/" + MedusaHorror.Gameplay.AchievementSystem.All.Length
+                + " last=" + (ac.LastUnlocked ?? "-");
+        }
+        if (op == "ACHPANEL")
+        {
+            var ac2 = MedusaHorror.Gameplay.AchievementSystem.Instance;
+            if (ac2 == null) return "[ACHPANEL] none";
+            ac2.SendMessage("TogglePanel", UnityEngine.SendMessageOptions.DontRequireReceiver);
+            return "[ACHPANEL] toggled";
+        }
+        if (op == "ACHIEVELIST")
+        {
+            var d = MedusaHorror.Core.SaveSystem.Data;
+            var list = d.achievements;
+            string ids = list == null || list.Count == 0 ? "-" : string.Join(",", list.ToArray());
+            return "[ACHIEVELIST] count=" + (list == null ? 0 : list.Count) + " ids=" + ids;
+        }
         if (op == "TUTORIALDIAG")
         {
             var td = UnityEngine.Object.FindObjectOfType<MedusaHorror.Gameplay.TutorialDirector>(true);
