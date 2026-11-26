@@ -58,6 +58,10 @@ namespace MedusaHorror.UI
         Text[] _slotTexts;
         Image[] _slotHighlights;
         RectTransform _bodyRect;
+        RectTransform _bodyViewport;
+        ScrollRect _bodyScroll;
+        Text _summary;
+        int _displayedPage = -1;
         const int SlotCount = 9;
         int _bagPage;
         string _dropConfirmation;
@@ -174,11 +178,22 @@ namespace MedusaHorror.UI
                 var events = new GameObject("PlayerPanelEventSystem", typeof(EventSystem));
                 events.transform.SetParent(transform, false);
 #if ENABLE_INPUT_SYSTEM
-                events.AddComponent<InputSystemUIInputModule>();
+                events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
 #else
                 events.AddComponent<StandaloneInputModule>();
 #endif
             }
+#if ENABLE_INPUT_SYSTEM
+            var eventSystem = EventSystem.current != null ? EventSystem.current : FindObjectOfType<EventSystem>();
+            if (eventSystem != null)
+            {
+                var module = eventSystem.GetComponent<InputSystemUIInputModule>();
+                if (module == null) module = eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+                foreach (var old in eventSystem.GetComponents<BaseInputModule>()) if (old != module) old.enabled = false;
+                module.enabled = true;
+                if (module.actionsAsset == null) module.AssignDefaultActions();
+            }
+#endif
             if (!_open)
             {
                 _previousBlocked = InputReader.blocked;
@@ -193,6 +208,14 @@ namespace MedusaHorror.UI
             Cursor.visible = true;
             Refresh();
             if (_canvas != null) _canvas.gameObject.SetActive(true);
+            if (_bodyScroll != null) _bodyScroll.verticalNormalizedPosition = 1f;
+        }
+
+        void LateUpdate()
+        {
+            if (!_open) return;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         public void Close()
@@ -285,41 +308,36 @@ namespace MedusaHorror.UI
                 for (int i = 0; i < _tabImgs.Length; i++)
                 {
                     if (_tabImgs[i] == null) continue;
-                    _tabImgs[i].sprite = i == _page ? UiAtlas.ButtonOn : UiAtlas.ButtonOff;
+                    _tabImgs[i].sprite = null;
                     _tabImgs[i].color = i == _page
-                        ? new Color(0.55f, 0.95f, 1f, 1f)
-                        : new Color(0.78f, 0.86f, 0.94f, 0.85f);
+                        ? new Color(0.12f, 0.35f, 0.39f, 1f)
+                        : new Color(0.065f, 0.12f, 0.15f, 1f);
                 }
             }
 
             bool bag = _page == 2;
             if (_bagGrid != null) _bagGrid.gameObject.SetActive(bag);
             if (_bagControls != null) _bagControls.SetActive(bag);
-            if (_bodyRect != null)
+            if (_bodyViewport != null)
             {
-                // 背包页把文字区压到下半屏，给 3×3 格子让位
-                if (bag)
-                {
-                    _bodyRect.anchorMin = new Vector2(0.56f, 0.18f);
-                    _bodyRect.anchorMax = new Vector2(0.91f, 0.75f);
-                    _bodyRect.offsetMin = Vector2.zero;
-                    _bodyRect.offsetMax = Vector2.zero;
-                }
-                else
-                {
-                    _bodyRect.anchorMin = Vector2.zero;
-                    _bodyRect.anchorMax = Vector2.one;
-                    _bodyRect.offsetMin = new Vector2(240f, 108f);
-                    _bodyRect.offsetMax = new Vector2(-240f, -132f);
-                }
+                _bodyViewport.anchorMin = bag ? new Vector2(0.58f, 0.28f) : new Vector2(0.07f, 0.18f);
+                _bodyViewport.anchorMax = new Vector2(0.94f, 0.73f);
+                _bodyViewport.offsetMin = _bodyViewport.offsetMax = Vector2.zero;
             }
             if (bag) FillBagGrid();
 
             if (_body != null) _body.text = BuildPage(_page);
+            if (_displayedPage != _page && _bodyScroll != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _bodyScroll.verticalNormalizedPosition = 1f;
+                _displayedPage = _page;
+            }
+            if (_summary != null) _summary.text = "等级 " + Progression.Level + "     信用点 " + Wallet.Coins + "     随身物品 " + Inventory.TotalCount + " 件";
             if (_hint != null)
                 _hint.text = _page == 2
                     ? "点击选择物品 · 数字键 1—9 使用 · ←/→ 翻页 · F 分类 · Tab/Esc 关闭"
-                    : "Q / E 或点击页签切换 · Tab / Esc 关闭";
+                    : "点击页签切换 · 鼠标滚轮阅读 · Q / E 切页 · Tab / Esc 返回";
         }
 
         /// <summary>刷新背包格子内容。</summary>
@@ -345,8 +363,8 @@ namespace MedusaHorror.UI
                 bool has = index < list.Count;
                 if (_slotIcons[i] != null)
                     _slotIcons[i].color = has
-                        ? new Color(0.55f, 0.82f, 1f, 0.55f)
-                        : new Color(0.50f, 0.60f, 0.70f, 0.16f);
+                        ? new Color(0.09f, 0.18f, 0.21f, 1f)
+                        : new Color(0.055f, 0.09f, 0.11f, 1f);
                 if (_slotTexts[i] != null)
                     _slotTexts[i].text = has ? ((i + 1) + "  [" + list[index].kind + "]\n" + list[index].name + "\n×" + list[index].count) : "";
                 if (_slotHighlights[i] != null)
@@ -587,29 +605,42 @@ namespace MedusaHorror.UI
             brt.offsetMin = Vector2.zero;
             brt.offsetMax = Vector2.zero;
             var img = bg.AddComponent<Image>();
-            img.color = new Color(0.02f, 0.03f, 0.05f, 0.985f);
+            img.color = new Color(0.01f, 0.02f, 0.025f, 0.80f);
 
             var font = CjkFont.Get();
-
-            BuildTabs(go.transform, font);
-            BuildArrows(go.transform);
-            BuildBagGrid(go.transform, font);
-            BuildBagControls(go.transform, font);
-
-            _body = MakeText(go.transform, font, 28, TextAnchor.UpperLeft,
-                new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
-                new Color(0.92f, 0.96f, 1f));
+            var shell = new GameObject("FieldRecord", typeof(RectTransform), typeof(Image));
+            var shellRt = shell.GetComponent<RectTransform>();shellRt.SetParent(go.transform,false);
+            shellRt.anchorMin = new Vector2(0.06f,0.06f);shellRt.anchorMax = new Vector2(0.94f,0.94f);
+            shellRt.offsetMin = shellRt.offsetMax = Vector2.zero;
+            shell.GetComponent<Image>().color = new Color(0.035f,0.065f,0.08f,0.99f);
+            var title=MakeText(shellRt,font,34,TextAnchor.MiddleLeft,new Vector2(0.06f,0.9f),new Vector2(0.06f,0.9f),Vector2.zero,new Vector2(440,60),Color.white);
+            title.rectTransform.pivot=new Vector2(0,0.5f);title.text="行动档案 / 随身终端";title.raycastTarget=false;
+            _summary=MakeText(shellRt,font,19,TextAnchor.MiddleRight,new Vector2(0.82f,0.91f),new Vector2(0.82f,0.91f),Vector2.zero,new Vector2(650,44),new Color(0.6f,0.77f,0.8f));_summary.rectTransform.pivot=new Vector2(1,0.5f);_summary.raycastTarget=false;
+            var close=BagButton(shellRt,font,"关闭 ×",new Vector2(0.93f,0.91f),Vector2.zero,new Vector2(125,46));close.name="ClosePanel";close.onClick.AddListener(Close);
+            BuildTabs(shellRt, font);
+            BuildBagGrid(shellRt, font);
+            BuildBagControls(shellRt, font);
+            var viewport=new GameObject("ReadingArea",typeof(RectTransform),typeof(Image),typeof(RectMask2D),typeof(ScrollRect));
+            _bodyViewport=viewport.GetComponent<RectTransform>();_bodyViewport.SetParent(shellRt,false);
+            viewport.GetComponent<Image>().color=new Color(0.02f,0.035f,0.045f,0.45f);
+            _bodyScroll=viewport.GetComponent<ScrollRect>();_bodyScroll.horizontal=false;_bodyScroll.scrollSensitivity=36;
+            _bodyScroll.movementType=ScrollRect.MovementType.Clamped;_bodyScroll.viewport=_bodyViewport;
+            _body = MakeText(_bodyViewport, font, 23, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(-38,0),
+                new Color(0.87f, 0.93f, 0.94f));
             _bodyRect = _body.rectTransform;
-            _bodyRect.offsetMin = new Vector2(240f, 108f);
-            _bodyRect.offsetMax = new Vector2(-240f, -132f);
-            _body.lineSpacing = 1.22f;
+            _bodyRect.pivot=new Vector2(0.5f,1);_bodyRect.anchoredPosition=new Vector2(0,-14);
+            _body.gameObject.AddComponent<ContentSizeFitter>().verticalFit=ContentSizeFitter.FitMode.PreferredSize;
+            _bodyScroll.content=_bodyRect;
+            _body.lineSpacing = 1.18f;
             _body.raycastTarget = false;
 
-            _hint = MakeText(go.transform, font, 26, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(1200f, 50f),
+            _hint = MakeText(shellRt, font, 19, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.065f), new Vector2(0.5f, 0.065f), Vector2.zero, new Vector2(1300f, 44f),
                 new Color(0.62f, 0.70f, 0.80f));
+            _hint.raycastTarget=false;
 
-            UiSkin.Apply(go.GetComponent<RectTransform>());
+            UiSkin.Apply(shellRt, false);
             go.SetActive(false);
         }
 
@@ -617,32 +648,31 @@ namespace MedusaHorror.UI
         void BuildTabs(Transform parent, Font font)
         {
             _tabImgs = new Image[PageNames.Length];
-            const float w = 240f, h = 76f, gap = 16f;
+            const float w = 230f, h = 54f, gap = 16f;
 
             for (int i = 0; i < PageNames.Length; i++)
             {
                 var b = new GameObject("Tab" + i, typeof(RectTransform));
                 b.transform.SetParent(parent, false);
                 var rt = b.GetComponent<RectTransform>();
-                rt.anchorMin = new Vector2(0.5f, 1f);
-                rt.anchorMax = new Vector2(0.5f, 1f);
+                rt.anchorMin = new Vector2(0.5f, 0.81f);
+                rt.anchorMax = new Vector2(0.5f, 0.81f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = new Vector2((i - (PageNames.Length - 1) * 0.5f) * (w + gap), -76f);
+                rt.anchoredPosition = new Vector2((i - (PageNames.Length - 1) * 0.5f) * (w + gap), 0);
                 rt.sizeDelta = new Vector2(w, h);
 
                 var img = b.AddComponent<Image>();
-                img.sprite = UiAtlas.ButtonOff;
-                img.type = Image.Type.Sliced;
+                img.sprite = null;
                 img.color = new Color(1f, 1f, 1f, 0.92f);
                 _tabImgs[i] = img;
 
                 int idx = i;
                 var btn = b.AddComponent<Button>();
                 btn.targetGraphic = img;
-                btn.transition = Selectable.Transition.None;
+                btn.transition = Selectable.Transition.ColorTint;
                 btn.onClick.AddListener(delegate { _page = idx; Refresh(); });
 
-                var t = MakeText(b.transform, font, 30, TextAnchor.MiddleCenter,
+                var t = MakeText(b.transform, font, 25, TextAnchor.MiddleCenter,
                     Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                     new Color(0.86f, 0.95f, 1f));
                 t.text = PageNames[i];
@@ -685,12 +715,12 @@ namespace MedusaHorror.UI
         void BuildBagGrid(Transform parent, Font font)
         {
             const int cols = 3, rows = 3;
-            const float cw = 210f, ch = 150f, gap = 18f;
+            const float cw = 178f, ch = 124f, gap = 14f;
 
             var grid = new GameObject("BagGrid", typeof(RectTransform));
             grid.transform.SetParent(parent, false);
             _bagGrid = grid.GetComponent<RectTransform>();
-            _bagGrid.anchorMin = _bagGrid.anchorMax = new Vector2(0.30f, 0.5f);
+            _bagGrid.anchorMin = _bagGrid.anchorMax = new Vector2(0.30f, 0.49f);
             _bagGrid.pivot = new Vector2(0.5f, 0.5f);
             _bagGrid.sizeDelta = new Vector2(cols * cw + (cols - 1) * gap, rows * ch + (rows - 1) * gap);
             _bagGrid.anchoredPosition = new Vector2(0f, -5f);
@@ -714,9 +744,9 @@ namespace MedusaHorror.UI
                     -(row - (rows - 1) * 0.5f) * (ch + gap));
 
                 var bgImg = s.AddComponent<Image>();
-                bgImg.sprite = UiAtlas.Icon;
-                bgImg.color = new Color(0.55f, 0.78f, 0.95f, 0.30f);
-                bgImg.preserveAspect = true;
+                bgImg.sprite = null;
+                bgImg.color = new Color(0.09f, 0.18f, 0.21f, 1f);
+                bgImg.preserveAspect = false;
                 bgImg.raycastTarget = true;
                 _slotIcons[i] = bgImg;
 
@@ -734,7 +764,8 @@ namespace MedusaHorror.UI
                 hImg.raycastTarget = false;
                 _slotHighlights[i] = hImg;
 
-                var t = MakeText(s.transform, font, 22, TextAnchor.MiddleCenter,
+                AddAssetBorder(s.transform);
+                var t = MakeText(s.transform, font, 20, TextAnchor.MiddleCenter,
                     Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-14f, -10f),
                     new Color(0.94f, 0.98f, 1f));
                 t.text = "";
@@ -778,16 +809,27 @@ namespace MedusaHorror.UI
             rt.anchoredPosition = position;
             rt.sizeDelta = size;
             var background = obj.GetComponent<Image>();
+            background.sprite = null;
             background.color = new Color(0.09f, 0.22f, 0.29f);
             var button = obj.GetComponent<Button>();
             button.targetGraphic = background;
             var colors = button.colors;
             colors.disabledColor = new Color(0.35f, 0.35f, 0.35f, 0.45f);
             button.colors = colors;
-            var text = MakeText(obj.transform, font, 24, TextAnchor.MiddleCenter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, Color.white);
+            var text = MakeText(obj.transform, font, 20, TextAnchor.MiddleCenter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, Color.white);
             text.text = label;
             text.raycastTarget = false;
+            AddAssetBorder(obj.transform);
             return button;
+        }
+
+        static void AddAssetBorder(Transform parent)
+        {
+            var edge=new GameObject("AssetFrame",typeof(RectTransform),typeof(Image));
+            edge.transform.SetParent(parent,false);var rt=edge.GetComponent<RectTransform>();
+            rt.anchorMin=Vector2.zero;rt.anchorMax=Vector2.one;rt.offsetMin=rt.offsetMax=Vector2.zero;
+            var image=edge.GetComponent<Image>();image.sprite=UiAtlas.Frame;image.type=Image.Type.Sliced;
+            image.color=new Color(0.3f,0.57f,0.62f,0.65f);image.raycastTarget=false;
         }
 
         void BuildBagControls(Transform parent, Font font)
@@ -802,7 +844,7 @@ namespace MedusaHorror.UI
             for (int i = 0; i < BagFilters.Length; i++)
             {
                 int filter = i;
-                var button = BagButton(rect, font, BagFilters[i], new Vector2(0.3f, 0.82f), new Vector2((i - 2.5f) * 112f, 0), new Vector2(104, 48));
+                var button = BagButton(rect, font, BagFilters[i], new Vector2(0.3f, 0.74f), new Vector2((i - 2.5f) * 94f, 0), new Vector2(88, 40));
                 button.onClick.AddListener(() => SelectFilter(filter));
                 _filterImages[i] = button.GetComponent<Image>();
             }
@@ -811,13 +853,11 @@ namespace MedusaHorror.UI
             _nextBag = BagButton(rect, font, "下一页", new Vector2(0.3f, 0.20f), new Vector2(215, 0), new Vector2(130, 48));
             _nextBag.onClick.AddListener(() => ChangeBagPage(1));
             _bagPageText = MakeText(rect, font, 24, TextAnchor.MiddleCenter, new Vector2(0.3f, 0.20f), new Vector2(0.3f, 0.20f), Vector2.zero, new Vector2(220, 48), Color.white);
-            _useButton = BagButton(rect, font, "使用物品", new Vector2(0.64f, 0.22f), Vector2.zero, new Vector2(210, 58));
+            _useButton = BagButton(rect, font, "使用物品", new Vector2(0.66f, 0.20f), Vector2.zero, new Vector2(200, 52));
             _useButton.onClick.AddListener(() => { _dropConfirmation = null; UseItem(_bagSel); });
-            _dropButton = BagButton(rect, font, "丢弃 ×1", new Vector2(0.80f, 0.22f), Vector2.zero, new Vector2(210, 58));
+            _dropButton = BagButton(rect, font, "丢弃 ×1", new Vector2(0.84f, 0.20f), Vector2.zero, new Vector2(200, 52));
             _dropButton.onClick.AddListener(() => DropItem(_bagSel));
             _dropLabel = _dropButton.GetComponentInChildren<Text>();
-            var close = BagButton(rect, font, "关闭", new Vector2(0.91f, 0.93f), Vector2.zero, new Vector2(110, 48));
-            close.onClick.AddListener(Close);
             _bagControls.SetActive(false);
         }
 

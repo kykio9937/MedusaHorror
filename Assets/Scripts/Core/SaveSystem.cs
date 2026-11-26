@@ -98,6 +98,7 @@ namespace MedusaHorror.Core
         [Header("新手引导")]
         [Tooltip("W1 操作引导是否已播放过")]
         public bool tutorialDone = false;
+        public bool hospitalTrainingPassed;
 
         [Header("角色成长")]
         public int level = 1;

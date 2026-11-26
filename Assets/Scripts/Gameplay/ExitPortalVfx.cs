@@ -220,6 +220,7 @@ namespace MedusaHorror.Gameplay
         bool ResolveUnlocked()
         {
             if (_portal == null) _portal = GetComponent<ExitPortal>();
+            if (_portal != null && (_portal.requireHospitalClues || _portal.requireBossDefeat)) return _portal.Activated;
             if (ExitPortal.KeyGranted) return true;
             return _portal != null && _portal.door != null && !_portal.door.Locked;
         }

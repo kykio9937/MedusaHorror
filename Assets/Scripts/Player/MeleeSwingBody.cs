@@ -144,7 +144,6 @@ namespace MedusaHorror.Player
         public void FreezePose(float u)
         {
             if (!BonesBound) Bind();
-            _frozen = true;
             Active = true;
             Phase = Mathf.Clamp01(u);
         }
@@ -152,7 +151,6 @@ namespace MedusaHorror.Player
         /// <summary>诊断用：解除定格并复位上身。</summary>
         public void ReleasePose()
         {
-            _frozen = false;
             Cancel();
         }
 
@@ -162,7 +160,6 @@ namespace MedusaHorror.Player
             Phase = 0f;
         }
 
-        bool _frozen;
         float _baseHandHeight;
         Vector3 _startChestFwd;
         Vector3 _startHandLocal;

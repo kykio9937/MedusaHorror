@@ -170,9 +170,13 @@ namespace MedusaHorror.EditorTools
                 BuildStargate(new Vector3(0f, 0f, 121f));
 
                 // ---------- bake navmesh ----------
-                foreach (var t in _root.GetComponentsInChildren<Transform>(true))
-                    GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.NavigationStatic);
-                UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
+                var navigation = _root.gameObject.AddComponent<Unity.AI.Navigation.NavMeshSurface>();
+                navigation.collectObjects = Unity.AI.Navigation.CollectObjects.Children;
+                navigation.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.PhysicsColliders;
+                navigation.BuildNavMesh();
+                if (navigation.navMeshData != null)
+                    AssetDatabase.CreateAsset(navigation.navMeshData,
+                        AssetDatabase.GenerateUniqueAssetPath("Assets/Scenes/W1_Hospital_GeneratedNavMesh.asset"));
                 log.AppendLine("navmesh baked");
 
                 // ---------- walkability ----------

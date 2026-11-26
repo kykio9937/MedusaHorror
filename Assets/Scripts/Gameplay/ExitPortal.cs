@@ -31,6 +31,8 @@ namespace MedusaHorror.Gameplay
         [Header("解锁方式")]
         [Tooltip("需要靠近按 E 点亮（幻兽帕鲁式）；点亮状态写入存档")]
         public bool requireActivation = false;
+        public bool requireHospitalClues;
+        public bool requireBossDefeat;
         [Tooltip("通过时扣多少信用点（0 = 免费）。余额不足会被拦下")]
         public int cost = 0;
 
@@ -66,6 +68,8 @@ namespace MedusaHorror.Gameplay
         {
             get
             {
+                if (requireHospitalClues && !W1ObjectiveState.Complete) return false;
+                if (requireBossDefeat && !s_bossDefeated) return false;
                 if (!requireActivation) return true;
                 var list = SaveSystem.Data.activatedPortals;
                 string k = PortalId;
@@ -80,6 +84,8 @@ namespace MedusaHorror.Gameplay
         {
             get
             {
+                if (requireHospitalClues && !W1ObjectiveState.Complete) return "医院线索 " + W1ObjectiveState.Count + "/" + W1ObjectiveState.Total + " · 集齐后启动";
+                if (requireBossDefeat && !s_bossDefeated) return "模拟训练尚未通过 · 击败二楼守卫";
                 if (requireActivation && !Activated) return "点亮传送门";
                 int fare = MedusaHorror.Core.Pricing.Apply(cost);
                 if (fare > 0)
@@ -93,11 +99,11 @@ namespace MedusaHorror.Gameplay
         }
 
         /// <summary>只有「未点亮」这一种状态需要按 E。</summary>
-        public bool CanInteract { get { return requireActivation && !Activated; } }
+        public bool CanInteract { get { return requireActivation && !Activated && (!requireHospitalClues || W1ObjectiveState.Complete); } }
 
         public void Interact()
         {
-            if (requireActivation && !Activated) ActivatePortal();
+            if (CanInteract) ActivatePortal();
         }
 
         void ActivatePortal()
@@ -156,7 +162,7 @@ namespace MedusaHorror.Gameplay
         {
             if (_leaving) return;
             SyncLock();
-            if (requireActivation && !Activated) return;
+            if (!Activated) return;
             if (requireKey && !s_keyGranted) return;
             if (door != null && !door.IsOpen) return;
             if (!PlayerInside()) return;

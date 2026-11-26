@@ -129,13 +129,13 @@ namespace MedusaHorror.Gameplay
 
             if (_light != null)
             {
-                bool unl = _portal == null || _portal.Activated || !_portal.requireActivation;
+                bool unl = _portal == null || _portal.Activated;
                 _light.intensity = (unl ? 2.6f : 0.9f) * (0.88f + 0.12f * Mathf.Sin(_t * pulseSpeed * 1.3f));
             }
 
             if (_mat != null)
             {
-                bool unlocked = _portal == null || _portal.Activated || !_portal.requireActivation;
+                bool unlocked = _portal == null || _portal.Activated;
                 float a = unlocked ? 0.95f : 0.40f;
                 var c = tint;
                 c.a = a * (0.85f + 0.15f * Mathf.Sin(_t * pulseSpeed * 1.7f));

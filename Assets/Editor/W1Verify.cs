@@ -31,7 +31,7 @@ namespace MedusaHorror.EditorTools
             int colliders = Object.FindObjectsOfType<Collider>(true).Length;
 
             // walkability over the level footprint
-            int samples = 0, blocked = 0, narrow = 0;
+            int samples = 0, blocked = 0;
             var rects = new (float x0, float z0, float x1, float z1)[]
             {
                 (-6f, 0f, 6f, 12f), (-4f, 12f, 4f, 20f), (-4f, 20f, 4f, 80f),

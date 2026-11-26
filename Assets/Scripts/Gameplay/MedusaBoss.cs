@@ -31,6 +31,7 @@ namespace MedusaHorror.Gameplay
         public bool wakeByFloorTrigger = false;
         public float wakeDelay = 1.2f;
         public float stopDistance = 1.9f;
+        public float minimumArenaY = 8.5f;
 
         [Header("二阶段（狂暴形态）")]
         [Range(0f, 1f)] public float phaseThreshold = 0.5f;
@@ -141,7 +142,7 @@ namespace MedusaHorror.Gameplay
             if (Current == State.Dead) return;
 
             // 三层战场保护：Boss 掉出三层（扶梯洞口/边缘）→ 传回刷新点继续战斗
-            if (Current != State.Dormant && transform.position.y < 8.5f)
+            if (Current != State.Dormant && transform.position.y < minimumArenaY)
             {
                 if (_cc != null) _cc.enabled = false;
                 transform.position = _home;

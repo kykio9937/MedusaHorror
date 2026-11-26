@@ -18,6 +18,8 @@ namespace MedusaHorror.Gameplay
         public Vector3 localCenter = new Vector3(0f, 1.35f, 0f);
         [Tooltip("模型朝向修正（度）")]
         public float yaw = 90f;
+        public Vector3 modelEulerOffset;
+        public bool modelAsFloorPad;
 
         [Header("动效")]
         public bool spin = true;
@@ -63,7 +65,7 @@ namespace MedusaHorror.Gameplay
             go.name = "PortalFrameModel";
             go.transform.SetParent(transform, false);
             go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.identity;
+            go.transform.localRotation = Quaternion.Euler(modelEulerOffset + new Vector3(0f, yaw, 0f));
             go.transform.localScale = Vector3.one;
 
             foreach (var c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);
@@ -78,15 +80,15 @@ namespace MedusaHorror.Gameplay
 
             // 尺寸自适应：把模型整体高度缩到 targetHeight
             Bounds b = ComputeBounds(go);
-            float h = Mathf.Max(0.001f, b.size.y);
+            float h = Mathf.Max(0.001f, modelAsFloorPad ? Mathf.Max(b.size.x,b.size.z) : b.size.y);
             float s = targetHeight / h;
-            go.transform.localScale = Vector3.one * s;
+            go.transform.localScale = modelAsFloorPad ? new Vector3(s,s*0.06f,s) : Vector3.one*s;
 
             // 缩放后重新取包围盒，把几何中心对到门洞中心
             Bounds b2 = ComputeBounds(go);
             Vector3 centerLocal = transform.InverseTransformPoint(b2.center);
+            if(modelAsFloorPad)centerLocal.y=transform.InverseTransformPoint(new Vector3(b2.center.x,b2.min.y,b2.center.z)).y;
             go.transform.localPosition += localCenter - centerLocal;
-            go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
 
             _root = go.transform;
             _diag = "ok size=" + b.size.ToString("F2") + " scale=" + s.ToString("F2") + " renderers=" + _renderers.Length;
@@ -139,7 +141,7 @@ namespace MedusaHorror.Gameplay
         void ApplyEmission()
         {
             if (_mat == null || _portal == null) return;
-            bool unlocked = _portal.Activated || !_portal.requireActivation;
+            bool unlocked = _portal.Activated;
             float e = unlocked ? unlockedEmission : lockedEmission;
             _mat.SetColor("_EmissionColor", new Color(0.45f, 0.85f, 1f) * e);
         }

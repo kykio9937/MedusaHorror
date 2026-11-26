@@ -16,6 +16,9 @@ namespace MedusaHorror.Gameplay
         public float activeRadius = 22f;
         public float respawnDelay = 14f;
         public string displayName = "";
+        public int maxTotalSpawns;
+        public float activationDistance;
+        int _totalSpawned;
 
         readonly List<Monster> _alive = new List<Monster>();
         float _nextCheck;
@@ -35,7 +38,7 @@ namespace MedusaHorror.Gameplay
             if (p != null)
             {
                 Vector3 d = p.position - transform.position; d.y = 0f;
-                if (d.magnitude > activeRadius * 2.5f) return;
+                if (d.magnitude > (activationDistance > 0 ? activationDistance : activeRadius * 2.5f)) return;
             }
 
             if (_alive.Count >= targetCount) return;
@@ -47,10 +50,17 @@ namespace MedusaHorror.Gameplay
 
         public Monster Spawn()
         {
+            if (maxTotalSpawns > 0 && _totalSpawned >= maxTotalSpawns) return null;
             _lastSpawn = Time.time;
-            var go = new GameObject("Monster_" + (string.IsNullOrEmpty(displayName) ? kind.ToString() : displayName));
             Vector2 rnd = Random.insideUnitCircle * spawnRadius;
-            go.transform.position = transform.position + new Vector3(rnd.x, 0f, rnd.y);
+            Vector3 position = transform.position + new Vector3(rnd.x, 0f, rnd.y);
+            if (maxTotalSpawns > 0)
+            {
+                if (!UnityEngine.AI.NavMesh.SamplePosition(position, out var nav, 2f, UnityEngine.AI.NavMesh.AllAreas)) return null;
+                position = nav.position;
+            }
+            var go = new GameObject("Monster_" + (string.IsNullOrEmpty(displayName) ? kind.ToString() : displayName));
+            go.transform.position = position;
             go.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
             var m = go.AddComponent<Monster>();
@@ -58,6 +68,7 @@ namespace MedusaHorror.Gameplay
             if (!string.IsNullOrEmpty(displayName)) m.displayName = displayName;
             m.ApplyKindPreset();
             _alive.Add(m);
+            _totalSpawned++;
             return m;
         }
 

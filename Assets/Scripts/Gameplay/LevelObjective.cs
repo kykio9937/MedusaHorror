@@ -24,6 +24,8 @@ namespace MedusaHorror.Gameplay
         public bool consumed;
         /// <summary>必需目标：全部达成才算本关目标完成；非必需的点只计入探索进度。</summary>
         public bool required = true;
+        public bool manualCompletion;
+        public bool hideWorldMarker;
 
         [HideInInspector] public LevelObjective owner;
 
@@ -39,6 +41,7 @@ namespace MedusaHorror.Gameplay
 
         void Update()
         {
+            if(hideWorldMarker){if(_ring!=null)_ring.enabled=false;if(_beam!=null)_beam.enabled=false;return;}
             if (consumed) return;
             _pulse += Time.deltaTime * 2.2f;
             float a = 0.30f + Mathf.Sin(_pulse) * 0.12f;
@@ -49,6 +52,7 @@ namespace MedusaHorror.Gameplay
 
         void BuildMarker()
         {
+            if(hideWorldMarker)return;
             if (_ring != null) return;
 
             var mat = new Material(Shader.Find("Sprites/Default"));
@@ -210,22 +214,26 @@ namespace MedusaHorror.Gameplay
             for (int i = 0; i < _points.Count; i++)
             {
                 var pt = _points[i];
-                if (pt == null || pt.consumed) continue;
+                if (pt == null || pt.consumed || pt.manualCompletion) continue;
                 if (Mathf.Abs(p.position.y - pt.transform.position.y) > 3f) continue;
                 float d = Vector3.Distance(new Vector3(p.position.x, 0f, p.position.z),
                                            new Vector3(pt.transform.position.x, 0f, pt.transform.position.z));
                 if (d <= pt.radius)
                 {
-                    pt.Consume();
-                    _progress++;
-                    var hud = ObjectiveHud.Instance;
-                    if (hud != null) hud.SetProgress(_progress, _points.Count);
-                    var audio = AudioDirector.Instance;
-                    if (audio != null) audio.Play(SfxId.Pickup, 0.8f, 1.05f);
-                    Debug.Log("[LevelObjective] 达成 " + _progress + "/" + _points.Count + " " + pt.label);
+                    CompletePoint(pt);
                 }
             }
 
+            if (_points.Count > 0 && AllRequiredReached()) Finish();
+        }
+
+        public void CompletePoint(LevelGoalPoint point)
+        {
+            if (point == null || point.consumed || !_points.Contains(point)) return;
+            point.Consume();
+            _progress++;
+            ObjectiveHud.Instance?.SetProgress(_progress, _points.Count);
+            AudioDirector.Instance?.Play(SfxId.Pickup, 0.8f, 1.05f);
             if (_points.Count > 0 && AllRequiredReached()) Finish();
         }
 

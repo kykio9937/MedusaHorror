@@ -215,6 +215,7 @@ namespace MedusaHorror.Player
         /// <summary>锁定 / 释放光标</summary>
         public void LockCursor(bool locked)
         {
+            if (locked && blocked) locked = false;
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;
         }

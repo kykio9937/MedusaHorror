@@ -30252,14 +30252,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 26217157}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 348693469}
+  m_Script: {fileID: 11500000, guid: c3f2e86b65934587a45f8c65c5673c64, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   houseId: W4_Apartment_7B
   furnitureId: sofa
   furnitureName: "\u6C99\u53D1"
   price: 150
-  furnitureObject: {fileID: 0}
+  furnitureObject: {fileID: 2021377360}
 --- !u!23 &26217160
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -377473,21 +377473,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.8434696, y: 20.07519, z: 0.2153793}
   m_Center: {x: 0.6537318, y: 0.025263786, z: 0}
---- !u!115 &348693469
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: FurnitureShop
-  m_Namespace: MedusaHorror.Gameplay
-  m_AssemblyName: Assembly-CSharp
 --- !u!1 &348776943
 GameObject:
   m_ObjectHideFlags: 0
@@ -617809,21 +617794,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!115 &573553249
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: HouseStorage
-  m_Namespace: MedusaHorror.Gameplay
-  m_AssemblyName: Assembly-CSharp
 --- !u!1 &573611775
 GameObject:
   m_ObjectHideFlags: 0
@@ -891592,7 +891562,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 830016890}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 348693469}
+  m_Script: {fileID: 11500000, guid: c3f2e86b65934587a45f8c65c5673c64, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   houseId: W4_Apartment_7B
@@ -2103078,7 +2103048,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1932011922}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 573553249}
+  m_Script: {fileID: 11500000, guid: 586b173c573f4493810f6652640aac4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   houseId: W4_Apartment_7B
@@ -2155687,7 +2155657,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1979770762}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a85f7fca2bd12ed4cbd976ec675d646b, type: 3}
+  m_Script: {fileID: 11500000, guid: 4e58d4b453474b239ea061ae12cfea53, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   houseId: W4_Apartment_7B

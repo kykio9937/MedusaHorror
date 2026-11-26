@@ -28,6 +28,8 @@ namespace MedusaHorror.Gameplay
         IInteractable target;
         Text hintText;
         Image hintBg;
+        RectTransform itemCard;
+        Text itemName, itemAction;
         readonly List<Collider> buffer = new List<Collider>(32);
 
         void Awake()
@@ -50,6 +52,7 @@ namespace MedusaHorror.Gameplay
         {
             if (hintText != null) hintText.enabled = false;
             if (hintBg != null) hintBg.enabled = false;
+            if (itemCard != null) itemCard.gameObject.SetActive(false);
         }
 
         // 放在 LateUpdate：确保 InputReader.Update 已经算完当帧的 InteractPressed
@@ -57,16 +60,27 @@ namespace MedusaHorror.Gameplay
         {
             target = InputReader.blocked ? null : FindTarget();
 
+            bool item = target is W1ObjectivePickup;
             bool show = target != null && hintText != null;
             if (hintText != null)
             {
-                hintText.enabled = show;
+                hintText.enabled = show && !item;
                 hintText.text = show ? ("[E] " + target.Hint) : string.Empty;
             }
             if (hintBg != null)
             {
-                hintBg.enabled = show;
+                hintBg.enabled = show && !item;
                 hintBg.transform.position = hintText.transform.position;
+            }
+            itemCard.gameObject.SetActive(show && item);
+            if (show && item)
+            {
+                var pickup=(W1ObjectivePickup)target;
+                itemName.text=pickup.label;itemAction.text="[E] 拾取";
+                var screen=Camera.main.WorldToScreenPoint(pickup.transform.position+Vector3.up*0.1f);
+                var parent=(RectTransform)itemCard.parent;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(parent,screen,null,out var local);
+                itemCard.anchoredPosition=new Vector2(Mathf.Clamp(local.x+155,-parent.rect.width/2+150,parent.rect.width/2-150),Mathf.Clamp(local.y,-parent.rect.height/2+55,parent.rect.height/2-55));
             }
 
             if (show && input != null && input.InteractPressed)
@@ -86,6 +100,15 @@ namespace MedusaHorror.Gameplay
                 if (c == null) continue;
                 var d = c.GetComponentInParent<IInteractable>();
                 if (d == null || !d.CanInteract) continue;
+                if (d is W1ObjectivePickup)
+                {
+                    var camera=Camera.main;if(camera==null)continue;
+                    var ray=camera.ViewportPointToRay(new Vector3(0.5f,0.5f,0));
+                    // A small angular tolerance keeps tiny models usable with the third-person reticle.
+                    var aimBounds=c.bounds;aimBounds.Expand(0.12f);
+                    if(!aimBounds.IntersectRay(ray))continue;
+                    if(!HasLineOfSight(camera.transform.position,c,d))continue;
+                }
                 Vector3 to = ((MonoBehaviour)d).transform.position - origin;
                 to.y = 0f;
                 if (to.sqrMagnitude < 0.0001f) continue;
@@ -123,6 +146,12 @@ namespace MedusaHorror.Gameplay
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
+            var card=new GameObject("FocusedItemCard",typeof(RectTransform),typeof(Image));
+            itemCard=card.GetComponent<RectTransform>();itemCard.SetParent(canvasGo.transform,false);
+            itemCard.sizeDelta=new Vector2(280,88);card.GetComponent<Image>().color=new Color(0.025f,0.045f,0.055f,0.94f);card.GetComponent<Image>().raycastTarget=false;
+            var outline=card.AddComponent<Outline>();outline.effectColor=new Color(0.4f,0.65f,0.68f,0.9f);outline.effectDistance=Vector2.one;
+            itemName=CardText("ItemName",itemCard,23,new Vector2(0,16),new Color(0.94f,0.96f,0.96f));
+            itemAction=CardText("PickupAction",itemCard,19,new Vector2(0,-18),new Color(0.65f,0.88f,0.84f));card.SetActive(false);
 
             // 背景条
             var bgGo = new GameObject("HintBg", typeof(RectTransform));
@@ -156,6 +185,13 @@ namespace MedusaHorror.Gameplay
             hintText.raycastTarget = false;
             hintText.horizontalOverflow = HorizontalWrapMode.Overflow;
             hintText.enabled = false;
+        }
+
+        static Text CardText(string name,Transform parent,int size,Vector2 position,Color color)
+        {
+            var go=new GameObject(name,typeof(RectTransform),typeof(Text));go.transform.SetParent(parent,false);
+            var rt=go.GetComponent<RectTransform>();rt.sizeDelta=new Vector2(260,34);rt.anchoredPosition=position;
+            var t=go.GetComponent<Text>();t.font=MedusaHorror.UI.CjkFont.Get();t.fontSize=size;t.alignment=TextAnchor.MiddleLeft;t.color=color;t.raycastTarget=false;return t;
         }
     }
 }

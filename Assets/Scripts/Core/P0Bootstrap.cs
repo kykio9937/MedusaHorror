@@ -95,6 +95,8 @@ namespace MedusaHorror.Core
 
             // 小地图 + 传送门导航罗盘（W1 医院继续用专用 MinimapRig，这里自动跳过）
             LevelMinimap.Ensure(scene.name);
+            if (scene.name == WastelandScene && SaveSystem.Data.hospitalTrainingPassed)
+                new GameObject("TrainingArrivalStory").AddComponent<TrainingArrival>();
             PortalCompass.Ensure();
 
             // 信用点 + 任务追踪 HUD（主菜单隐藏）
@@ -373,6 +375,7 @@ namespace MedusaHorror.Core
         /// <summary>W1: collect the five clue items, then the stargate unlocks.</summary>
         static void SetupHospitalObjectives()
         {
+            W1ObjectiveState.Reset();
             if (LevelObjective.Active != null) return;
             var root = new GameObject("LevelObjectiveRuntime");
             var objective = root.AddComponent<LevelObjective>();
@@ -387,7 +390,14 @@ namespace MedusaHorror.Core
                 ("手术室密码本", new Vector3(0f, 1.1f, 102f)),
             };
             foreach (var s in spots)
-                AddGoalPoint(root.transform, s.pos, GoalKind.Reach, s.label, 2.2f, true);
+            {
+                AddGoalPoint(root.transform, s.pos, GoalKind.Collect, s.label, 2.2f, true);
+                var goal = root.transform.GetChild(root.transform.childCount - 1).GetComponent<LevelGoalPoint>();
+                goal.manualCompletion = true;
+                goal.hideWorldMarker = true;
+                foreach (var pickup in Object.FindObjectsOfType<W1ObjectivePickup>())
+                    if (pickup.label == s.label) { goal.transform.position = pickup.transform.position; pickup.goal = goal; }
+            }
         }
 
         static void AddGoalPoint(Transform parent, Vector3 worldPos, GoalKind kind, string label, float radius, bool required)
