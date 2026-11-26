@@ -261,7 +261,7 @@ namespace MedusaHorror.Core
             {
                 case WastelandScene: title = "第一章 · 穿过荒废村庄 · 找到村口传送门"; break;
                 case SubwayScene: title = "第二章 · 登上地铁列车 · 前往霓虹街区"; break;
-                case NeonStreetScene: title = "第三章 · 穿过霓虹街区 · 在公寓落脚后前往星门"; break;
+                case NeonStreetScene: title = "第三章 · 探索商店与义体门诊 · 前往离场星门"; break;
                 default: title = "终章 · 抵达外星星门 · 离开这颗星球"; break;
             }
 
@@ -310,19 +310,9 @@ namespace MedusaHorror.Core
                     Vector3 b = exitPoint.position;
                     for (int i = 1; i <= 2; i++)
                     {
-                        Vector3 p = Vector3.Lerp(a, b, i / 3f);
-                        NavMeshHit hit;
-                        if (NavMesh.SamplePosition(p, out hit, 14f, NavMesh.AllAreas)) p = hit.position;
-                        else
-                        {
-                            // 素材包原场景没有烘焙 NavMesh，改用向下射线贴地
-                            RaycastHit gh;
-                            if (Physics.Raycast(p + Vector3.up * 80f, Vector3.down, out gh, 300f,
-                                                ~0, QueryTriggerInteraction.Ignore))
-                                p = gh.point;
-                        }
+                        if (!TryRoutePoint(a, b, i / 3f, out Vector3 p)) continue;
                         AddGoalPoint(root.transform, p + Vector3.up * 0.9f,
-                                     GoalKind.Reach, "探索点 " + i, 4.5f, false);
+                                     GoalKind.Reach, "前往出口 · 路线 " + i, 4.5f, false);
                         placed++;
                     }
                 }
@@ -352,6 +342,31 @@ namespace MedusaHorror.Core
             // Awake 时场景里还没有子目标点，这里补一次统计
             objective.RefreshPoints();
             Debug.Log("[P0] " + scene.name + " 目标点 " + placed + " 个，标题「" + title + "」");
+        }
+
+        static bool TryRoutePoint(Vector3 from, Vector3 to, float fraction, out Vector3 point)
+        {
+            point = default;
+            if (!NavMesh.SamplePosition(from, out var start, 5f, NavMesh.AllAreas) ||
+                !NavMesh.SamplePosition(to, out var end, 3f, NavMesh.AllAreas)) return false;
+            var path = new NavMeshPath();
+            if (!NavMesh.CalculatePath(start.position, end.position, NavMesh.AllAreas, path) ||
+                path.status != NavMeshPathStatus.PathComplete) return false;
+            var corners = path.corners;
+            float length = 0;
+            for (int i = 1; i < corners.Length; i++) length += Vector3.Distance(corners[i - 1], corners[i]);
+            float remaining = length * fraction;
+            for (int i = 1; i < corners.Length; i++)
+            {
+                float segment = Vector3.Distance(corners[i - 1], corners[i]);
+                if (remaining <= segment)
+                {
+                    point = Vector3.Lerp(corners[i - 1], corners[i], remaining / Mathf.Max(segment, 0.001f));
+                    return true;
+                }
+                remaining -= segment;
+            }
+            return false;
         }
 
 

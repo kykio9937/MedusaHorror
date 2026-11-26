@@ -23,10 +23,10 @@ namespace MedusaHorror.UI
             if (!explore)
             {
                 // 主菜单/基地/医院：收起小地图，避免残留面板
-                if (_inst != null) _inst.SetShown(false);
+                if (_inst != null) { _inst._available = false; _inst.SetShown(false); }
                 return null;
             }
-            if (_inst != null) { _inst.SetShown(true); _inst.SetScene(sceneName); return _inst; }
+            if (_inst != null) { _inst._available = true; _inst.SetShown(true); _inst.SetScene(sceneName); return _inst; }
             var go = new GameObject("LevelMinimapRuntime");
             DontDestroyOnLoad(go);
             var mm = go.AddComponent<LevelMinimap>();
@@ -36,6 +36,7 @@ namespace MedusaHorror.UI
 
         public void SetShown(bool on)
         {
+            if (on && !_visible) _renderTimer = 0f;
             _visible = on;
             if (_panel != null) _panel.gameObject.SetActive(on);
         }
@@ -56,11 +57,15 @@ namespace MedusaHorror.UI
 
         Transform _player;
         Vector3 _playerPos;
+        Vector3 _mapCenter;
+        float _renderTimer;
+        const float MapRefreshInterval = 0.125f;
 
         float _ortho = 45f;
         float _camY = 45f;
         bool _absCamY;
         bool _visible = true;
+        bool _available = true;
 
         float _iconTimer;
         float _scanTimer;
@@ -86,14 +91,26 @@ namespace MedusaHorror.UI
             BuildCamera();
         }
 
-        void OnDestroy() { if (_inst == this) _inst = null; }
+        void OnDestroy()
+        {
+            if (_inst == this) _inst = null;
+            if (_cam != null) _cam.targetTexture = null;
+            if (_rt != null) { _rt.Release(); Destroy(_rt); }
+        }
 
         void OnEnable() { Camera.onPreRender += PreRender; Camera.onPostRender += PostRender; }
-        void OnDisable() { Camera.onPreRender -= PreRender; Camera.onPostRender -= PostRender; }
+        void OnDisable()
+        {
+            PostRender(_cam);
+            Camera.onPreRender -= PreRender;
+            Camera.onPostRender -= PostRender;
+        }
 
         void SetScene(string s)
         {
             _scene = s;
+            _player = null;
+            _renderTimer = 0f;
             switch (s)
             {
                 case "W3_Subway": _ortho = 19f; _absCamY = true; _camY = 3.75f; break;
@@ -200,6 +217,8 @@ namespace MedusaHorror.UI
             var camGo = new GameObject("MinimapCam");
             camGo.transform.SetParent(transform, false);
             _cam = camGo.AddComponent<Camera>();
+            // Render the cached map explicitly, rather than drawing the city every frame.
+            _cam.enabled = false;
             _cam.orthographic = true;
             _cam.orthographicSize = _ortho;
             _cam.nearClipPlane = 0.1f;
@@ -241,13 +260,28 @@ namespace MedusaHorror.UI
 
         void LateUpdate()
         {
+            if (!_available) return;
+            if (InteractionPanelInput.Pressed(KeyCode.M)) SetShown(!_visible);
+            if (!_visible) return;
             if (_player == null) AcquirePlayer();
             if (_player != null)
             {
                 _playerPos = _player.position;
-                float y = _absCamY ? _camY : _playerPos.y + _camY;
-                _cam.transform.position = new Vector3(_playerPos.x, y, _playerPos.z);
                 _arrow.localRotation = Quaternion.Euler(0f, 0f, -_player.eulerAngles.y);
+                _renderTimer -= Time.unscaledDeltaTime;
+                if (_renderTimer <= 0f)
+                {
+                    _renderTimer = MapRefreshInterval;
+                    _mapCenter = _playerPos;
+                    float y = _absCamY ? _camY : _playerPos.y + _camY;
+                    _cam.transform.position = new Vector3(_mapCenter.x, y, _mapCenter.z);
+                    try { _cam.Render(); }
+                    finally { PostRender(_cam); }
+                }
+                // Icons and the player arrow follow every frame over the cached image.
+                float ppm = ViewSize / (_ortho * 2f);
+                _arrow.anchoredPosition = new Vector2((_playerPos.x - _mapCenter.x) * ppm,
+                    (_playerPos.z - _mapCenter.z) * ppm);
             }
 
             _scanTimer -= Time.deltaTime;
@@ -258,11 +292,6 @@ namespace MedusaHorror.UI
 
             UpdateIconPositions();
 
-            if (Input.GetKeyDown(KeyCode.M))
-            {
-                _visible = !_visible;
-                _panel.gameObject.SetActive(_visible);
-            }
         }
 
         void AcquirePlayer()
@@ -335,7 +364,7 @@ namespace MedusaHorror.UI
                 if (ic.img == null) continue;
                 if (ic.target == null) { ic.img.enabled = false; continue; }
                 Vector3 wp = ic.target.position;
-                Vector2 p = new Vector2((wp.x - _playerPos.x) * ppm, (wp.z - _playerPos.z) * ppm);
+                Vector2 p = new Vector2((wp.x - _mapCenter.x) * ppm, (wp.z - _mapCenter.z) * ppm);
                 bool inRange = Mathf.Abs(p.x) <= half && Mathf.Abs(p.y) <= half;
                 p.x = Mathf.Clamp(p.x, -half, half);
                 p.y = Mathf.Clamp(p.y, -half, half);

@@ -119,7 +119,10 @@ namespace MedusaHorror.Gameplay
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;
             vel.space = ParticleSystemSimulationSpace.World;
+            // Unity requires the same curve mode on all three velocity axes.
+            vel.x = new ParticleSystem.MinMaxCurve(0f, 0f);
             vel.y = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
+            vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
             var mat = MakeMat(new Color(0.8f, 0.9f, 1f, 0.35f));

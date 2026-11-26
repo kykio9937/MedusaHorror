@@ -19,7 +19,7 @@ namespace MedusaHorror.Gameplay
 
         void Update()
         {
-            if (used || target == null) return;
+            if (used || target == null || target.value <= 0f) return;
             Vector3 a = new Vector3(target.transform.position.x, 0f, target.transform.position.z);
             Vector3 b = new Vector3(transform.position.x, 0f, transform.position.z);
             if (Vector3.Distance(a, b) <= pickupRadius) Take();

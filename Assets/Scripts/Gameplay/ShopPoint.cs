@@ -27,9 +27,10 @@ namespace MedusaHorror.Gameplay
         Canvas _canvas;
         Text _body;
         Text _title;
+        readonly MedusaHorror.UI.InteractionPanelInput _panelInput = new MedusaHorror.UI.InteractionPanelInput();
 
         public string Hint { get { return shopName + " · 按 E 进店"; } }
-        public bool CanInteract { get { return true; } }
+        public bool CanInteract { get { return !_open && !MedusaHorror.UI.InteractionPanelInput.GameplayBlocked; } }
         public bool IsOpen { get { return _open; } }
         public int GoodsCount { get { return _goods.Count; } }
 
@@ -46,12 +47,12 @@ namespace MedusaHorror.Gameplay
                 shopName = string.IsNullOrEmpty(shopName) ? "黑刃工坊" : shopName;
                 _goods.Add(new Goods
                 {
-                    id = "w_ed1", name = "刃口强化 I", desc = "近战伤害 +10%", price = 400,
+                    id = "w_ed1", name = "刃口强化 I", desc = "近战 / 射击伤害 +10%", price = 400,
                     buy = () => PlayerStats.AddDamage(0.1f)
                 });
                 _goods.Add(new Goods
                 {
-                    id = "w_ed2", name = "刃口强化 II", desc = "近战伤害 再 +10%", price = 700,
+                    id = "w_ed2", name = "刃口强化 II", desc = "近战 / 射击伤害 再 +10%", price = 700,
                     buy = () => PlayerStats.AddDamage(0.1f)
                 });
                 _goods.Add(new Goods
@@ -85,6 +86,8 @@ namespace MedusaHorror.Gameplay
 
         void Open()
         {
+            if (_open) return;
+            _panelInput.Open();
             _open = true;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -97,9 +100,10 @@ namespace MedusaHorror.Gameplay
             if (!_open) return;
             _open = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            _panelInput.Close();
         }
+
+        void OnDisable() { Close(); }
 
         public bool Buy(int index)
         {
@@ -130,10 +134,10 @@ namespace MedusaHorror.Gameplay
         void Update()
         {
             if (!_open) return;
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Escape)) { Close(); return; }
             for (int i = 0; i < _goods.Count && i < 9; i++)
             {
-                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) { Buy(i); return; }
+                if (MedusaHorror.UI.InteractionPanelInput.Pressed((KeyCode)((int)KeyCode.Alpha1 + i))) { Buy(i); return; }
             }
         }
 

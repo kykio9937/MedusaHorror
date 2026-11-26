@@ -23,9 +23,10 @@ namespace MedusaHorror.Gameplay
         string _shownId;
         Canvas _canvas;
         Text _body;
+        readonly MedusaHorror.UI.InteractionPanelInput _panelInput = new MedusaHorror.UI.InteractionPanelInput();
 
         public string Hint { get { return "星门控制台 · 选择你的结局"; } }
-        public bool CanInteract { get { return true; } }
+        public bool CanInteract { get { return !IsOpen && !MedusaHorror.UI.InteractionPanelInput.GameplayBlocked; } }
         public bool IsOpen { get { return _open || _showing; } }
         public int EndingCount { get { return _endings.Count; } }
 
@@ -72,6 +73,8 @@ namespace MedusaHorror.Gameplay
 
         void Open()
         {
+            if (IsOpen) return;
+            _panelInput.Open();
             _showing = false;
             _open = true;
             Cursor.lockState = CursorLockMode.None;
@@ -85,9 +88,10 @@ namespace MedusaHorror.Gameplay
             _open = false;
             _showing = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            _panelInput.Close();
         }
+
+        void OnDisable() { Close(); }
 
         /// <summary>选择结局；未解锁返回 false。</summary>
         public bool Choose(int index)
@@ -109,15 +113,15 @@ namespace MedusaHorror.Gameplay
         void Update()
         {
             if (!IsOpen) return;
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Escape)) { Close(); return; }
             if (_showing)
             {
-                if (Input.GetKeyDown(KeyCode.R)) { Close(); SceneLoader.Load("MainMenu", "回到主菜单"); }
+                if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.R)) { Close(); SceneLoader.Load("MainMenu", "回到主菜单"); }
                 return;
             }
             for (int i = 0; i < _endings.Count && i < 9; i++)
             {
-                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) { Choose(i); return; }
+                if (MedusaHorror.UI.InteractionPanelInput.Pressed((KeyCode)((int)KeyCode.Alpha1 + i))) { Choose(i); return; }
             }
         }
 

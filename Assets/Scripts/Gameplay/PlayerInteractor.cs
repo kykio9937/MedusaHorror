@@ -55,7 +55,7 @@ namespace MedusaHorror.Gameplay
         // 放在 LateUpdate：确保 InputReader.Update 已经算完当帧的 InteractPressed
         void LateUpdate()
         {
-            target = FindTarget();
+            target = InputReader.blocked ? null : FindTarget();
 
             bool show = target != null && hintText != null;
             if (hintText != null)
@@ -90,10 +90,26 @@ namespace MedusaHorror.Gameplay
                 to.y = 0f;
                 if (to.sqrMagnitude < 0.0001f) continue;
                 if (Vector3.Dot(fwd, to.normalized) < facingDot) continue;
+                if (!HasLineOfSight(origin, c, d)) continue;
                 float dist = to.magnitude;
                 if (dist < bestDist) { bestDist = dist; best = d; }
             }
             return best;
+        }
+
+        bool HasLineOfSight(Vector3 origin, Collider candidate, IInteractable interactable)
+        {
+            Vector3 end = candidate.ClosestPoint(origin);
+            Vector3 direction = end - origin;
+            if (direction.sqrMagnitude < 0.0001f) return true;
+            foreach (var hit in Physics.RaycastAll(origin, direction.normalized, direction.magnitude,
+                         ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.transform.IsChildOf(transform)) continue;
+                if (hit.collider.GetComponentInParent<IInteractable>() == interactable) continue;
+                return false;
+            }
+            return true;
         }
 
         void BuildUi()

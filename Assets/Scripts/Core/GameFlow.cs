@@ -486,6 +486,7 @@ namespace MedusaHorror.Core
             bool pauseHit = false;
             if (kb != null && !InputReader.debugOverrideEnabled && kb[pauseKey].wasPressedThisFrame) pauseHit = true;
             if (debugPausePulse) { debugPausePulse = false; pauseHit = true; }
+            if (State == RunState.Running && (InputReader.blocked || MedusaHorror.UI.InteractionPanelInput.ClosingThisFrame)) pauseHit = false;
             if (pauseHit)
             {
                 if (State == RunState.Running) { Pause(); return; }

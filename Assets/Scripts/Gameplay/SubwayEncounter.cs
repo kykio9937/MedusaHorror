@@ -19,10 +19,11 @@ namespace MedusaHorror.Gameplay
         bool _resolved;
         Canvas _canvas;
         Text _body;
+        readonly MedusaHorror.UI.InteractionPanelInput _panelInput = new MedusaHorror.UI.InteractionPanelInput();
         System.Random _rng = new System.Random();
 
         public string Hint { get { return encounterName + " · 按 E 探索"; } }
-        public bool CanInteract { get { return true; } }
+        public bool CanInteract { get { return !_open && !MedusaHorror.UI.InteractionPanelInput.GameplayBlocked; } }
         public bool IsOpen { get { return _open; } }
         public int Depth { get { return _depth; } }
 
@@ -30,6 +31,8 @@ namespace MedusaHorror.Gameplay
 
         void Open()
         {
+            if (_open) return;
+            _panelInput.Open();
             _open = true;
             _resolved = false;
             _depth = 0;
@@ -41,11 +44,13 @@ namespace MedusaHorror.Gameplay
 
         public void Close()
         {
+            if (!_open) return;
             _open = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            _panelInput.Close();
         }
+
+        void OnDisable() { Close(); }
 
         /// <summary>调试用：强制当前层事件类型（0 商人 1 流浪者 2 怪物）。</summary>
         public void ForceEvent(int e)
@@ -56,6 +61,7 @@ namespace MedusaHorror.Gameplay
 
         void NextLayer()
         {
+            _resolved = false;
             _depth++;
             if (_depth > maxDepth) { Finish(true); return; }
             _event = _rng.Next(0, 3);
@@ -65,7 +71,8 @@ namespace MedusaHorror.Gameplay
         /// <summary>选择当前层的选项（0 或 1）。</summary>
         public void Choose(int option)
         {
-            if (!_open || _resolved) return;
+            if (!_open || _resolved || option < 0 || option > 1) return;
+            _resolved = true;
 
             if (_event == 0) ChooseMerchant(option);
             else if (_event == 1) ChooseWanderer(option);
@@ -77,7 +84,7 @@ namespace MedusaHorror.Gameplay
             if (option == 0)
             {
                 int price = Pricing.Apply(150);
-                if (!Wallet.Spend(price)) { LootToast.Show("信用点不够，贩子把布收了回去。"); return; }
+                if (!Wallet.Spend(price)) { _resolved = false; LootToast.Show("信用点不够，贩子把布收了回去。"); return; }
                 PlayerStats.AddPetrifyResist(0.05f);
                 Inventory.Add("quartz", "石英粉", 1, "研磨过的石英粉，贴着皮肤能压住石化的蔓延", "消耗");
                 LootToast.Show("买到一罐石英粉 · 石化抗性 +5%");
@@ -150,10 +157,10 @@ namespace MedusaHorror.Gameplay
         void Update()
         {
             if (!_open) return;
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Escape)) { Close(); return; }
             if (_resolved) return;
-            if (Input.GetKeyDown(KeyCode.Alpha1)) Choose(0);
-            else if (Input.GetKeyDown(KeyCode.Alpha2)) Choose(1);
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Alpha1)) Choose(0);
+            else if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Alpha2)) Choose(1);
         }
 
         void Refresh()

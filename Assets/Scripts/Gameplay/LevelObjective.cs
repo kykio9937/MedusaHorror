@@ -211,6 +211,7 @@ namespace MedusaHorror.Gameplay
             {
                 var pt = _points[i];
                 if (pt == null || pt.consumed) continue;
+                if (Mathf.Abs(p.position.y - pt.transform.position.y) > 3f) continue;
                 float d = Vector3.Distance(new Vector3(p.position.x, 0f, p.position.z),
                                            new Vector3(pt.transform.position.x, 0f, pt.transform.position.z));
                 if (d <= pt.radius)

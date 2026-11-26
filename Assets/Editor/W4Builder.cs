@@ -412,8 +412,9 @@ namespace MedusaHorror.EditorTools
             // 自由布置家具：屋内按 B 打开建造菜单
             var buildMode = house.AddComponent<MedusaHorror.Gameplay.HouseBuildMode>();
             buildMode.houseId = "W4_Apartment_7B";
-            buildMode.houseCenter = new Vector3(hx, 0f, hz);
-            buildMode.houseRadius = 20f;
+            buildMode.houseCenter = house.transform.Find("HouseFloor").GetComponent<Collider>().bounds.center;
+            buildMode.houseCenter += Vector3.up * 0.05f;
+            buildMode.houseRadius = Mathf.Min(w, d) * 0.5f;
 
             var chest = LevelKit.Slab("HouseChest", house.transform, new Vector3(hx - 2.0f, 0.35f, hz + 2.6f),
                 new Vector3(0.9f, 0.7f, 0.6f), floorMat);

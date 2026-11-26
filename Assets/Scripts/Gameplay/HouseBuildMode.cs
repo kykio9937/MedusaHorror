@@ -328,6 +328,9 @@ namespace MedusaHorror.Gameplay
         public string houseId = "W4_Apartment_7B";
         public Vector3 houseCenter;
         public float houseRadius = 12f;
+        Collider _floor;
+        Bounds _doorClearance;
+        bool _hasDoor;
 
         static HouseBuildMode _instance;
 
@@ -336,13 +339,86 @@ namespace MedusaHorror.Gameplay
         Text _body;
         Text _hint;
         bool _open;
+        readonly MedusaHorror.UI.InteractionPanelInput _panelInput = new MedusaHorror.UI.InteractionPanelInput();
 
         void Awake()
         {
             _instance = this;
+            ResolveRoom();
             if (houseCenter == Vector3.zero) houseCenter = transform.position;
             Restore();
             Build();
+        }
+
+        void ResolveRoom()
+        {
+            var floor = transform.Find("HouseFloor");
+            _floor = floor != null ? floor.GetComponent<Collider>() : null;
+            if (_floor != null)
+            {
+                var b = _floor.bounds;
+                houseCenter = new Vector3(b.center.x, b.max.y, b.center.z);
+            }
+            var door = transform.Find("HouseDoor");
+            var col = door != null ? door.GetComponent<Collider>() : null;
+            _hasDoor = col != null;
+            if (_hasDoor)
+            {
+                _doorClearance = col.bounds;
+                // Reserve the doorway and its approach even after the door swings open.
+                _doorClearance.Expand(new Vector3(2.4f, 0f, 0.5f));
+            }
+        }
+
+        bool InsideRoom(Vector3 position)
+        {
+            if (_floor == null) return false;
+            var b = _floor.bounds;
+            return position.x > b.min.x + 0.1f && position.x < b.max.x - 0.1f
+                && position.z > b.min.z + 0.1f && position.z < b.max.z - 0.1f
+                && position.y >= b.max.y - 0.3f && position.y < b.max.y + 2f;
+        }
+
+        static Vector3 FurnitureSize(string id)
+        {
+            switch (id)
+            {
+                case "cabinet": return new Vector3(1.2f, 1.8f, 0.7f);
+                case "bed": return new Vector3(1.5f, 1f, 2.1f);
+                case "bench": return new Vector3(1.6f, 1.2f, 0.9f);
+                case "lamp": return new Vector3(0.6f, 2f, 0.6f);
+                case "shelf": return new Vector3(1.4f, 2f, 0.45f);
+                default: return new Vector3(0.65f, 1f, 0.65f);
+            }
+        }
+
+        bool CanPlace(string id, Vector3 position, float yaw)
+        {
+            if (_floor == null) return false;
+            var rotation = Quaternion.Euler(0, yaw, 0);
+            var size = FurnitureSize(id);
+            var room = _floor.bounds;
+            for (int x = -1; x <= 1; x += 2)
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    var corner = position + rotation * new Vector3(x * (size.x * 0.5f + 0.08f), 0, z * (size.z * 0.5f + 0.08f));
+                    if (corner.x <= room.min.x + 0.1f || corner.x >= room.max.x - 0.1f
+                        || corner.z <= room.min.z + 0.1f || corner.z >= room.max.z - 0.1f) return false;
+                }
+            var center = position + Vector3.up * (size.y * 0.5f + 0.04f);
+            var half = size * 0.5f;
+            var worldBounds = new Bounds(center, Vector3.zero);
+            for (int x = -1; x <= 1; x += 2)
+                for (int z = -1; z <= 1; z += 2)
+                    worldBounds.Encapsulate(center + rotation * new Vector3(x * half.x, half.y, z * half.z));
+            worldBounds.Encapsulate(center - Vector3.up * half.y);
+            if (_hasDoor && _doorClearance.Intersects(worldBounds)) return false;
+            foreach (var hit in Physics.OverlapBox(center, half + new Vector3(0.04f, 0, 0.04f), rotation, ~0, QueryTriggerInteraction.Collide))
+            {
+                if (hit == _floor) continue;
+                if (!hit.isTrigger || hit.GetComponentInParent<HouseFurniture>() != null) return false;
+            }
+            return true;
         }
 
         void OnDestroy()
@@ -367,16 +443,16 @@ namespace MedusaHorror.Gameplay
             {
                 var p = PlayerRef.Transform;
                 if (p == null) return false;
-                Vector3 d = p.position - houseCenter; d.y = 0f;
-                return d.magnitude <= houseRadius;
+                return InsideRoom(p.position);
             }
         }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.B))
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.B))
             {
                 if (_open) { Close(); return; }
+                if (InputReader.blocked) return;
                 if (!Owned) { LootToast.Show("先买下这套房子，才能布置家具。"); return; }
                 if (!PlayerInside) { LootToast.Show("回到自己的屋里再布置。"); return; }
                 Open();
@@ -384,11 +460,11 @@ namespace MedusaHorror.Gameplay
             }
             if (!_open) return;
 
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Escape)) { Close(); return; }
 
             for (int i = 0; i < FurnitureKit.All.Length && i < 9; i++)
             {
-                if (!Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
+                if (!MedusaHorror.UI.InteractionPanelInput.Pressed((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
                 Place(FurnitureKit.All[i]);
                 return;
             }
@@ -396,6 +472,7 @@ namespace MedusaHorror.Gameplay
 
         void Place(FurnitureKit.Def def)
         {
+            if (!Owned || !PlayerInside) { LootToast.Show("请在自己的屋内布置家具。"); return; }
             if (def.id == "plant")
             {
                 int count = 0;
@@ -415,6 +492,13 @@ namespace MedusaHorror.Gameplay
             Vector3 pos = player.position + fwd.normalized * 2.2f;
             pos.y = houseCenter.y;
             float yaw = player.eulerAngles.y + 180f;
+
+            Physics.SyncTransforms();
+            if (!CanPlace(def.id, pos, yaw))
+            {
+                LootToast.Show("这里放不下，请避开墙壁、家具和门口；未扣信用点。");
+                return;
+            }
 
             Wallet.Spend(cost);
             var go = FurnitureKit.Build(def.id, transform, pos, yaw, houseId);
@@ -469,8 +553,9 @@ namespace MedusaHorror.Gameplay
 
         void Open()
         {
+            if (_open) return;
+            _panelInput.Open();
             _open = true;
-            InputReader.blocked = true;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             Refresh();
@@ -479,12 +564,13 @@ namespace MedusaHorror.Gameplay
 
         void Close()
         {
+            if (!_open) return;
             _open = false;
-            InputReader.blocked = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            _panelInput.Close();
         }
+
+        void OnDisable() { Close(); }
 
         void Refresh()
         {

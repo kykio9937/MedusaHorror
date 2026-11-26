@@ -135,6 +135,7 @@ namespace MedusaHorror.UI
 
             if (KeyDown(KeyCode.Tab))
             {
+                if (!_open && InputReader.blocked) return;
                 if (_open) Close(); else Open();
                 return;
             }
@@ -198,6 +199,7 @@ namespace MedusaHorror.UI
         {
             if (!_open) return;
             _open = false;
+            InteractionPanelInput.MarkClosed();
             InputReader.blocked = _previousBlocked;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
             Cursor.lockState = _previousCursor;

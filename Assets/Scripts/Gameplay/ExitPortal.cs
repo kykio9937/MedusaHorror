@@ -207,9 +207,9 @@ namespace MedusaHorror.Gameplay
         {
             if (_player == null)
             {
-                var pet = Object.FindObjectOfType<PlayerPetrify>();
-                if (pet == null) return false;
-                _player = pet.transform;
+                var controller = Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>();
+                if (controller == null) return false;
+                _player = controller.transform;
             }
             Vector3 local = transform.InverseTransformPoint(_player.position);
             // 必须真正跨过门扇平面（local.x >= InnerEdge），站在门外不算进入

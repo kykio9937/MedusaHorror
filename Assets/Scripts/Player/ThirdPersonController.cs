@@ -127,6 +127,13 @@ namespace MedusaHorror.Player
             ApplyMotion();
         }
 
+        public void ResetVerticalMotion()
+        {
+            _verticalVelocity = 0f;
+            _airJumpsUsed = 0;
+            _planarSpeed = 0f;
+        }
+
         /// <summary>鼠标水平转身：累积 yaw 后平滑套用到角色根节点</summary>
         void ApplyHorizontalTurning()
         {

@@ -506,8 +506,9 @@ namespace MedusaHorror.Gameplay
             get
             {
                 if (TrainRide.Instance != null && TrainRide.Instance.Riding) return "列车 · 已在车上";
-                if (Wallet.CanAfford(fare)) return "列车 · 上车（" + fare + " 信用点，E）";
-                return "列车 · 信用点不足（需 " + fare + "，现有 " + Wallet.Coins + "）";
+                  if (fare <= 0) return "列车 · 免费前往霓虹街区（E）";
+                  if (Wallet.CanAfford(fare)) return "列车 · 上车（" + fare + " 信用点，E）";
+                  return "列车 · 车票 " + fare + " 信用点，还差 " + Mathf.Max(0, fare - Wallet.Coins) + " · 可探索站台赚取";
             }
         }
 
@@ -518,7 +519,7 @@ namespace MedusaHorror.Gameplay
             if (TrainRide.Instance != null && TrainRide.Instance.Riding) return;
             if (!Wallet.Spend(fare))
             {
-                UI.StoryBanner.Show("信用点不足", "乘车去霓虹街区要 " + fare + " 信用点，你只有 " + Wallet.Coins + "。", 2.6f);
+                UI.StoryBanner.Show("信用点不足", "车票 " + fare + " 信用点，还差 " + Mathf.Max(0, fare - Wallet.Coins) + "。可先探索站台遭遇，赚取车费。", 3.5f);
                 return;
             }
             var t = TrainRide.Ensure(stationReturn);

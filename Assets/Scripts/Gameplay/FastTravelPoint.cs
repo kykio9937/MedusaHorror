@@ -13,6 +13,7 @@ namespace MedusaHorror.Gameplay
         bool _open;
         Canvas _canvas;
         Text _body;
+        readonly MedusaHorror.UI.InteractionPanelInput _panelInput = new MedusaHorror.UI.InteractionPanelInput();
         readonly List<string> _targets = new List<string>();
 
         bool Owned
@@ -26,7 +27,7 @@ namespace MedusaHorror.Gameplay
         }
 
         public string Hint { get { return Owned ? "快速旅行 · 前往已点亮区域" : "快速旅行 · 先在门口购置公寓"; } }
-        public bool CanInteract { get { return true; } }
+        public bool CanInteract { get { return !_open && !MedusaHorror.UI.InteractionPanelInput.GameplayBlocked; } }
         public bool IsOpen { get { return _open; } }
         public int TargetCount { get { return _targets.Count; } }
 
@@ -40,6 +41,8 @@ namespace MedusaHorror.Gameplay
 
         void Open()
         {
+            if (_open) return;
+            _panelInput.Open();
             _targets.Clear();
             var list = SaveSystem.Data.activatedPortals;
             string cur = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
@@ -63,9 +66,10 @@ namespace MedusaHorror.Gameplay
             if (!_open) return;
             _open = false;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            _panelInput.Close();
         }
+
+        void OnDisable() { Close(); }
 
         public void TravelTo(int index)
         {
@@ -78,10 +82,10 @@ namespace MedusaHorror.Gameplay
         void Update()
         {
             if (!_open) return;
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (MedusaHorror.UI.InteractionPanelInput.Pressed(KeyCode.Escape)) { Close(); return; }
             for (int i = 0; i < _targets.Count && i < 9; i++)
             {
-                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) { TravelTo(i); return; }
+                if (MedusaHorror.UI.InteractionPanelInput.Pressed((KeyCode)((int)KeyCode.Alpha1 + i))) { TravelTo(i); return; }
             }
         }
 
