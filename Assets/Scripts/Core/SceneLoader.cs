@@ -224,7 +224,6 @@ namespace MedusaHorror.Core
             switch (scene)
             {
                 case "W0_Base": return "中继站";
-                case "W1_Hospital": return "W1 · 废弃医院";
                 case "W2_Wasteland": return "W2 · 荒废村庄";
                 case "W3_Subway": return "W3 · 地下铁";
                 case "W4_NeonStreet": return "W4 · 霓虹街区";

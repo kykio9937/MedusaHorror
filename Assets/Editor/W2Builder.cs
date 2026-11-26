@@ -64,7 +64,7 @@ namespace MedusaHorror.EditorTools
             list.RemoveAll(s => s.path == ScenePath);
             int insertAt = 0;
             for (int i = 0; i < list.Count; i++)
-                if (list[i].path.EndsWith("W1_Hospital.unity")) insertAt = i + 1;
+                if (list[i].path.EndsWith("W0_Base.unity")) insertAt = i + 1;
             list.Insert(insertAt, new EditorBuildSettingsScene(ScenePath, true));
             EditorBuildSettings.scenes = list.ToArray();
 

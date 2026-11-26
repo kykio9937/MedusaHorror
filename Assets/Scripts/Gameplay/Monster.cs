@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using MedusaHorror.Core;
 using MedusaHorror.Player;
 
@@ -52,14 +53,34 @@ namespace MedusaHorror.Gameplay
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
+        NavMeshAgent _agent;
+
         void Awake()
         {
+            EnsureAgent();
             Health = maxHealth;
             _bobPhase = Random.Range(0f, 6.28f);
             State = "idle";
             if (transform.childCount == 0) BuildVisual();
             CacheRenderers();
             _mpb = new MaterialPropertyBlock();
+        }
+
+
+        void EnsureAgent()
+        {
+            if (_agent != null) return;
+            _agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+            if (_agent == null) _agent = gameObject.AddComponent<UnityEngine.AI.NavMeshAgent>();
+            _agent.radius = 0.35f;
+            _agent.height = 1.7f;
+            _agent.baseOffset = 0f;
+            _agent.speed = chaseSpeed;
+            _agent.angularSpeed = 540f;
+            _agent.acceleration = 18f;
+            _agent.stoppingDistance = 0.7f;
+            _agent.updateRotation = false;   // we already face the player manually
+            _agent.autoBraking = true;
         }
 
         void Start()
@@ -243,6 +264,7 @@ namespace MedusaHorror.Gameplay
 
         void Idle(float dt)
         {
+            if (_agent != null && _agent.isOnNavMesh) _agent.isStopped = true;
             if (_body == null) return;
             _bobPhase += dt * 2.2f;
             var p = _body.localPosition;
@@ -254,7 +276,24 @@ namespace MedusaHorror.Gameplay
         {
             Vector3 to = Flat(player.position) - Flat(transform.position);
             if (to.sqrMagnitude < 0.0001f) return;
-            Vector3 dir = to.normalized;
+            EnsureAgent();
+            if (_agent != null && _agent.isOnNavMesh)
+            {
+                _agent.speed = chaseSpeed;
+                _agent.isStopped = false;
+                _agent.SetDestination(player.position);
+                FaceTo(player.position, dt, 6f);
+                if (_body != null)
+                {
+                    _bobPhase += dt * 9f;
+                    var pb = _body.localPosition;
+                    pb.y = 0.85f + Mathf.Abs(Mathf.Sin(_bobPhase)) * 0.06f;
+                    _body.localPosition = pb;
+                }
+                return;
+            }
+
+            Vector3 dir = AvoidWalls(to.normalized);
             transform.position += dir * chaseSpeed * dt;
             SnapToGround();
             FaceTo(player.position, dt, 6f);
@@ -265,6 +304,26 @@ namespace MedusaHorror.Gameplay
                 p.y = 0.85f + Mathf.Abs(Mathf.Sin(_bobPhase)) * 0.06f;
                 _body.localPosition = p;
             }
+        }
+
+
+        /// <summary>Simple wall avoidance: if the direct path is blocked, slide along the
+        /// first free side direction (the project has no NavMesh package).</summary>
+        Vector3 AvoidWalls(Vector3 dir)
+        {
+            const float probe = 0.9f;
+            Vector3 origin = transform.position + Vector3.up * 0.9f;
+            RaycastHit hit;
+            if (!Physics.SphereCast(origin, 0.3f, dir, out hit, probe, ~0, QueryTriggerInteraction.Ignore))
+                return dir;
+
+            Vector3[] sides = { Quaternion.Euler(0, 55, 0) * dir, Quaternion.Euler(0, -55, 0) * dir, Quaternion.Euler(0, 90, 0) * dir, Quaternion.Euler(0, -90, 0) * dir };
+            for (int i = 0; i < sides.Length; i++)
+            {
+                if (!Physics.SphereCast(origin, 0.3f, sides[i], out hit, probe, ~0, QueryTriggerInteraction.Ignore))
+                    return sides[i];
+            }
+            return dir;
         }
 
         void FaceTo(Vector3 world, float dt, float speed)

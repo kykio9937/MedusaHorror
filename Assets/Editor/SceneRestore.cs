@@ -518,6 +518,54 @@ namespace MedusaHorror.EditorTools
             return "[NOCLIP] keys=" + keywords + " objs=" + n + " colliders=" + total;
         }
 
+        /// <summary>
+        /// 只删除指定根对象下的实体碰撞：保留 isTrigger 触发器（传送门/机关）、跳过名字含 skipKeywords 的对象（如地板），
+        /// 用于让美术建筑可穿行但视觉与结构完整，不再整片替换。
+        /// </summary>
+        public static string StripCollidersUnder(string levelPath, string rootName, string skipKeywords)
+        {
+            if (EditorApplication.isPlaying) return "[STRIPUNDER] 播放中拒绝";
+            if (!System.IO.File.Exists(levelPath)) return "[STRIPUNDER] 不存在: " + levelPath;
+
+            var skip = string.IsNullOrEmpty(skipKeywords) ? new string[0] : skipKeywords.Split(',');
+            for (int i = 0; i < skip.Length; i++) skip[i] = skip[i].Trim();
+
+            var sc = EditorSceneManager.OpenScene(levelPath, OpenSceneMode.Single);
+            int removed = 0, objs = 0;
+            bool found = false;
+            var roots = sc.GetRootGameObjects();
+            for (int r = 0; r < roots.Length; r++)
+            {
+                if (roots[r].name != rootName) continue;
+                found = true;
+                var trs = roots[r].GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < trs.Length; i++)
+                {
+                    if (trs[i] == null) continue;
+                    bool skipThis = false;
+                    for (int k = 0; k < skip.Length; k++)
+                        if (skip[k].Length > 0 && trs[i].name.IndexOf(skip[k], System.StringComparison.OrdinalIgnoreCase) >= 0) { skipThis = true; break; }
+                    if (skipThis) continue;
+                    var cols = trs[i].GetComponents<Collider>();
+                    bool any = false;
+                    for (int k = 0; k < cols.Length; k++)
+                    {
+                        if (cols[k] == null) continue;
+                        if (cols[k].isTrigger) continue;   // 保留触发器
+                        Object.DestroyImmediate(cols[k]);
+                        removed++; any = true;
+                    }
+                    if (any) objs++;
+                }
+            }
+            if (removed > 0)
+            {
+                EditorSceneManager.MarkSceneDirty(sc);
+                EditorSceneManager.SaveScene(sc, levelPath);
+            }
+            return "[STRIPUNDER] root=" + rootName + (found ? "" : "(未找到)") + " objs=" + objs + " removed=" + removed;
+        }
+
         /// <summary>取消传送门的激活/钥匙前置条件（换场景后原有激活机关可能已不存在）。</summary>
         public static string UnlockPortal(string levelPath, string objName)
         {
@@ -861,6 +909,65 @@ namespace MedusaHorror.EditorTools
             EditorSceneManager.MarkSceneDirty(sc);
             bool ok = EditorSceneManager.SaveScene(sc);
             return "[STRIPPKG] scene=" + sc.name + " removed=" + n + " saved=" + ok;
+        }
+
+        /// <summary>按脚本类名移除场景中的 MonoBehaviour（用于清理素材包 demo 控制脚本）。</summary>
+        public static string StripScriptsByName(string levelPath, string names)
+        {
+            if (EditorApplication.isPlaying) return "[STRIPSCRIPT] 播放中拒绝";
+            if (!System.IO.File.Exists(levelPath)) return "[STRIPSCRIPT] 不存在: " + levelPath;
+            var keys = names.Split(',');
+            var sc = EditorSceneManager.OpenScene(levelPath, OpenSceneMode.Single);
+            int n = 0;
+            var roots = sc.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                var all = roots[i].GetComponentsInChildren<MonoBehaviour>(true);
+                for (int j = 0; j < all.Length; j++)
+                {
+                    var mb = all[j];
+                    if (mb == null) continue;
+                    string t = mb.GetType().Name;
+                    for (int k = 0; k < keys.Length; k++)
+                    {
+                        if (t == keys[k].Trim()) { Object.DestroyImmediate(mb); n++; break; }
+                    }
+                }
+            }
+            EditorSceneManager.MarkSceneDirty(sc);
+            bool ok = EditorSceneManager.SaveScene(sc);
+            return "[STRIPSCRIPT] scene=" + sc.name + " removed=" + n + " saved=" + ok;
+        }
+
+        /// <summary>从另一个场景按根对象名复制对象到目标场景并保存。</summary>
+        public static string CopyRootsFrom(string levelPath, string srcPath, string names)
+        {
+            if (EditorApplication.isPlaying) return "[COPYROOTS] 播放中拒绝";
+            if (!System.IO.File.Exists(levelPath)) return "[COPYROOTS] 目标不存在: " + levelPath;
+            if (!System.IO.File.Exists(srcPath)) return "[COPYROOTS] 源不存在: " + srcPath;
+            var keys = names.Split(',');
+            var dst = EditorSceneManager.OpenScene(levelPath, OpenSceneMode.Single);
+            var src = EditorSceneManager.OpenScene(srcPath, OpenSceneMode.Additive);
+            int n = 0;
+            var sb = new System.Text.StringBuilder();
+            var srcRoots = src.GetRootGameObjects();
+            for (int i = 0; i < srcRoots.Length; i++)
+            {
+                var root = srcRoots[i];
+                bool hit = false;
+                for (int k = 0; k < keys.Length; k++)
+                    if (root.name == keys[k].Trim()) { hit = true; break; }
+                if (!hit) continue;
+                var clone = Object.Instantiate(root);
+                clone.name = root.name;
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(clone, dst);
+                n++;
+                sb.Append(root.name).Append(' ');
+            }
+            EditorSceneManager.MarkSceneDirty(dst);
+            EditorSceneManager.SaveScene(dst);
+            EditorSceneManager.CloseScene(src, true);
+            return "[COPYROOTS] copied=" + n + " [" + sb.ToString().Trim() + "]";
         }
     }
 }

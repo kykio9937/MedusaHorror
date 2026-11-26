@@ -26,6 +26,7 @@ namespace MedusaHorror.Player
         public PlayerWeapon gun;
         [Tooltip("脉冲步枪（等级 5 解锁），留空则运行时自动创建")]
         public PlayerWeapon rifle;
+        public GameObject rifleModel;
         public InputReader input;
         public WeaponHud hud;
         public WeaponKind startWeapon = WeaponKind.Sword;
@@ -50,12 +51,22 @@ namespace MedusaHorror.Player
         /// <summary>诊断用：>-1 时下一帧切到该武器（0 剑 / 1 枪），与真实输入走同一判定。</summary>
         public static int debugSwitchTo = -1;
 
-        /// <summary>诊断用：1=数字键 1，2=数字键 2，3=Q，下一帧按真实输入路径处理一次。</summary>
+        /// <summary>诊断用：1/2/3 对应数字键，4 对应 Q，下一帧按真实输入路径处理一次。</summary>
         public static int debugPressKey = 0;
 
         bool _bossSeen;
         float _bossPollTimer;
         float _lastToastTime = -10f;
+        const float SwitchDuration = 1.6f;
+        const float StowDuration = 0.7f;
+        float _switchElapsed;
+        bool _equipped, _swapped;
+        WeaponKind _pendingWeapon;
+        string _pendingSource;
+        public bool IsSwitching { get; private set; }
+        public float StowAmount => !IsSwitching ? 0f : (_swapped
+            ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_switchElapsed - StowDuration) / (SwitchDuration - StowDuration)))
+            : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_switchElapsed / StowDuration)));
 
         void Awake()
         {
@@ -97,6 +108,8 @@ namespace MedusaHorror.Player
             var go = new GameObject("PulseRifle");
             go.transform.SetParent(transform, false);
             var w = go.AddComponent<PlayerWeapon>();
+            if (gun != null) { w.gunModel = gun.gunModel; w.gunMaterial = gun.gunMaterial; w.gunModelLength = 0.62f; }
+            if (rifleModel != null) { w.gunModel = rifleModel; w.gunMaterial = null; }
             w.damage = 24f;
             w.roundsPerSecond = 8.5f;
             w.magazineSize = 30;
@@ -128,6 +141,17 @@ namespace MedusaHorror.Player
 
         void Update()
         {
+            if (IsSwitching)
+            {
+                _switchElapsed += Time.deltaTime;
+                if (!_swapped && _switchElapsed >= StowDuration)
+                {
+                    ApplyEquipment(_pendingWeapon, _pendingSource);
+                    _swapped = true;
+                }
+                if (_switchElapsed >= SwitchDuration) IsSwitching = false;
+                return;
+            }
             if (gun == null || sword == null || hud == null) ResolveRefs();
 
             if (autoUnlockOnBossDefeat && !gunUnlocked) PollBossDefeat();
@@ -161,7 +185,7 @@ namespace MedusaHorror.Player
                 if (input.Weapon2Pressed) { HandlePress(2, "数字键 2"); return; }
                 if (input.Weapon3Pressed) { HandlePress(3, "数字键 3"); return; }
             }
-            if (useToggleKey && input.SwitchWeaponPressed) HandlePress(3, "Q 切换");
+            if (useToggleKey && input.SwitchWeaponPressed) HandlePress(4, "Q 切换");
         }
 
         /// <summary>统一按键入口：数字键 1 / 2 与 Q 都经此判定，封锁态下切枪请求被驳回并回落剑。</summary>
@@ -227,6 +251,7 @@ namespace MedusaHorror.Player
         /// <summary>装备指定武器：显隐模型、切换输入开关、刷新 HUD。封锁态下枪的请求回落为剑。</summary>
         public void Equip(WeaponKind kind, string source = "切换")
         {
+            if (IsSwitching) return;
             bool isFirearm = kind == WeaponKind.Gun || kind == WeaponKind.Rifle;
             if (isFirearm && !gunUnlocked)
             {
@@ -255,6 +280,21 @@ namespace MedusaHorror.Player
             }
 
             EnsureRifle();
+            if (_equipped && kind != Current)
+            {
+                IsSwitching = true;
+                _switchElapsed = 0f;
+                _swapped = false;
+                _pendingWeapon = kind;
+                _pendingSource = source;
+                return;
+            }
+            ApplyEquipment(kind, source);
+        }
+
+        void ApplyEquipment(WeaponKind kind, string source)
+        {
+            _equipped = true;
             Current = kind;
             SwitchCount++;
             LastSwitchSource = source;
@@ -262,6 +302,8 @@ namespace MedusaHorror.Player
             if (sword != null) sword.SetActiveState(kind == WeaponKind.Sword);
             if (gun != null) gun.SetActiveState(kind == WeaponKind.Gun);
             if (rifle != null) rifle.SetActiveState(kind == WeaponKind.Rifle);
+            var animationRig = GetComponent<PlayerAnimRig>();
+            if (animationRig != null) animationRig.SetSwordVisible(kind == WeaponKind.Sword);
 
             if (hud != null)
             {
@@ -271,6 +313,11 @@ namespace MedusaHorror.Player
 
             var audio = AudioDirector.Instance;
             if (audio != null) audio.Play(SfxId.WeaponSwitch, 0.55f, kind == WeaponKind.Sword ? 1.06f : 0.94f);
+        }
+
+        void OnDisable()
+        {
+            IsSwitching = false;
         }
     }
 }

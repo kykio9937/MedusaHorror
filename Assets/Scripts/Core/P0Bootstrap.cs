@@ -13,11 +13,11 @@ namespace MedusaHorror.Core
     public static class P0Bootstrap
     {
         public const string BaseScene = "W0_Base";
-        public const string HospitalScene = "W1_Hospital";
         public const string WastelandScene = "W2_Wasteland";
         public const string SubwayScene = "W3_Subway";
         public const string NeonStreetScene = "W4_NeonStreet";
         public const string AlienGateScene = "W5_AlienGate";
+        public const string HospitalScene = "W1_Hospital";
         public const string MenuScene = "MainMenu";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -46,14 +46,13 @@ namespace MedusaHorror.Core
             {
                 audio.ApplySceneMusic(scene.name);
                 int adopted = 0;
-                if (scene.name == HospitalScene) audio.AdoptSceneAmbience();
                 adopted = audio.AdoptedAmbienceCount;
                 Debug.Log("[P0] 音频：mixer=" + (audio.MixerLoaded ? "loaded" : "missing") +
                           " bgm=playing bgmKey=" + audio.SceneMusicKey + " ambienceAdopted=" + adopted);
             }
 
             // P0-2 失败 / 重开闭环：战斗关卡都需要局内流程中枢
-            if (scene.name == BaseScene || scene.name == HospitalScene || scene.name == WastelandScene
+            if (scene.name == BaseScene || scene.name == WastelandScene
                 || scene.name == SubwayScene || scene.name == NeonStreetScene || scene.name == AlienGateScene)
                 GameFlow.Ensure();
 
@@ -241,6 +240,12 @@ namespace MedusaHorror.Core
 
         static void SetupObjectives(Scene scene)
         {
+            if (scene.name == HospitalScene)
+            {
+                SetupHospitalObjectives();
+                return;
+            }
+
             if (System.Array.IndexOf(ExploreScenes, scene.name) < 0)
             {
                 // 非探索关卡（基地/医院/主菜单）：清掉上一关残留的目标 HUD
@@ -254,10 +259,10 @@ namespace MedusaHorror.Core
             string title;
             switch (scene.name)
             {
-                case WastelandScene: title = "走访荒废村庄 · 抵达村口传送门"; break;
-                case SubwayScene: title = "登上列车 · 前往霓虹街区"; break;
-                case NeonStreetScene: title = "穿过霓虹街区 · 抵达传送门"; break;
-                default: title = "抵达外星星门"; break;
+                case WastelandScene: title = "第一章 · 穿过荒废村庄 · 找到村口传送门"; break;
+                case SubwayScene: title = "第二章 · 登上地铁列车 · 前往霓虹街区"; break;
+                case NeonStreetScene: title = "第三章 · 穿过霓虹街区 · 在公寓落脚后前往星门"; break;
+                default: title = "终章 · 抵达外星星门 · 离开这颗星球"; break;
             }
 
             var root = new GameObject("LevelObjectiveRuntime");
@@ -347,6 +352,27 @@ namespace MedusaHorror.Core
             // Awake 时场景里还没有子目标点，这里补一次统计
             objective.RefreshPoints();
             Debug.Log("[P0] " + scene.name + " 目标点 " + placed + " 个，标题「" + title + "」");
+        }
+
+
+        /// <summary>W1: collect the five clue items, then the stargate unlocks.</summary>
+        static void SetupHospitalObjectives()
+        {
+            if (LevelObjective.Active != null) return;
+            var root = new GameObject("LevelObjectiveRuntime");
+            var objective = root.AddComponent<LevelObjective>();
+            objective.objectiveTitle = "序章 · 在医院中搜寻 5 件线索 · 激活星门";
+
+            var spots = new (string label, Vector3 pos)[]
+            {
+                ("值班室钥匙", new Vector3(-10f, 1.1f, 26f)),
+                ("药房阀门",   new Vector3(-10f, 1.1f, 50f)),
+                ("检查室门禁卡", new Vector3(10f, 1.1f, 38f)),
+                ("储物间保险丝", new Vector3(10f, 1.1f, 74f)),
+                ("手术室密码本", new Vector3(0f, 1.1f, 102f)),
+            };
+            foreach (var s in spots)
+                AddGoalPoint(root.transform, s.pos, GoalKind.Reach, s.label, 2.2f, true);
         }
 
         static void AddGoalPoint(Transform parent, Vector3 worldPos, GoalKind kind, string label, float radius, bool required)

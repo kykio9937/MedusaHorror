@@ -450,7 +450,9 @@ namespace MedusaHorror.UI
                     else
                     {
                         var info = MedusaHorror.Core.SaveSystem.GetSlotInfo(latest);
-                        label = "继续游戏 — " + info.sceneName;
+                        label = Application.CanStreamedLevelBeLoaded(info.sceneName)
+                            ? "继续游戏 — " + info.sceneName
+                            : "继续游戏 — 从基地开始";
                     }
                 }
 
@@ -955,6 +957,11 @@ namespace MedusaHorror.UI
         {
             if (string.IsNullOrEmpty(scene)) scene = gameScene;
             Time.timeScale = 1f;
+            if (!Application.CanStreamedLevelBeLoaded(scene))
+            {
+                Debug.LogWarning("[MainMenu] 场景 " + scene + " 不在 Build Settings，回退到 " + gameScene);
+                scene = gameScene;
+            }
             if (Application.CanStreamedLevelBeLoaded(scene))
                 MedusaHorror.Core.SceneLoader.Load(scene, MedusaHorror.Core.SceneLoader.DisplayName(scene));
             else

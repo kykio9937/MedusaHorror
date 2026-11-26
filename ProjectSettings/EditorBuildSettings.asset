@@ -13,7 +13,7 @@ EditorBuildSettings:
     guid: a94b5e6b261bc7f488e5492e855d7e26
   - enabled: 1
     path: Assets/Scenes/W1_Hospital.unity
-    guid: e412a566eea97fb4f9692f88d24a27b4
+    guid: 14ec30e7b28a09f4b8512195f91fff1e
   - enabled: 1
     path: Assets/Scenes/W2_Wasteland.unity
     guid: 08c24ecdb3cf9894e9ba76f8c329bf24
@@ -25,8 +25,5 @@ EditorBuildSettings:
     guid: 8ef509cbde7c8124b87b8177e934a14d
   - enabled: 1
     path: Assets/Scenes/W5_AlienGate.unity
-    guid: 6fae639399887274e9192cc3874f19e3
-  - enabled: 1
-    path: Assets/Scenes/W1_Sandbox.unity
-    guid: 36d6287fdd325ed4787cf2f88a89853d
+    guid: 10f169369a955fd428f7901481555d23
   m_configObjects: {}

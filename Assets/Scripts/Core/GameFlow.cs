@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using MedusaHorror.Gameplay;
 using MedusaHorror.Player;
 using MedusaHorror.UI;
@@ -43,7 +43,7 @@ namespace MedusaHorror.Core
 
         [Header("按键")]
         public Key restartKey = Key.R;
-        public Key quitKey = Key.Q;
+        public Key quitKey = Key.None;   // Q 已经用于切武器，退出给个空键避免误触
         public Key pauseKey = Key.Escape;
         public Key menuKey = Key.M;
         [Tooltip("胜利后「继续前进」按键：关闭结算面板，恢复自由行动去拾取钥匙")]
@@ -216,7 +216,6 @@ namespace MedusaHorror.Core
         {
             if (string.IsNullOrEmpty(name)) return "-";
             if (name.StartsWith("W0")) return "基地";
-            if (name.StartsWith("W1")) return "废弃医院";
             if (name.StartsWith("W2")) return "荒原";
             if (name.StartsWith("W3")) return "地下铁";
             if (name.StartsWith("W4")) return "霓虹街区";
@@ -512,7 +511,7 @@ namespace MedusaHorror.Core
                 if (kb != null)
                 {
                     if (kb[restartKey].wasPressedThisFrame) { Restart(); return; }
-                    if (kb[quitKey].wasPressedThisFrame) { QuitGame(); return; }
+                    if (quitKey != Key.None && kb[quitKey].wasPressedThisFrame) { QuitGame(); return; }
                     if (kb[menuKey].wasPressedThisFrame) { ToMenu(); return; }
                 }
             }
@@ -533,7 +532,7 @@ namespace MedusaHorror.Core
             if (kb == null) return false;
             if (State == RunState.Won && kb[advanceKey].wasPressedThisFrame) { ContinueRun(); return true; }
             if (kb[restartKey].wasPressedThisFrame) { Restart(); return true; }
-            if (State == RunState.Failed && kb[quitKey].wasPressedThisFrame) { QuitGame(); return true; }
+            if (State == RunState.Failed && quitKey != Key.None && kb[quitKey].wasPressedThisFrame) { QuitGame(); return true; }
             if (State == RunState.Won && kb[menuKey].wasPressedThisFrame) { ToMenu(); return true; }
             return false;
         }
@@ -828,3 +827,4 @@ namespace MedusaHorror.Core
         }
     }
 }
+

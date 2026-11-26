@@ -95,6 +95,7 @@ namespace MedusaHorror.Player
         float _nextSwing;
         float _lastSwingTime = -999f;
         float _swingElapsed = -1f;
+        float _activeSwingDuration;
         Quaternion _bladeBaseRot;
         Vector3 _bladeBasePos;
         bool _bladeCaptured;
@@ -221,13 +222,16 @@ namespace MedusaHorror.Player
         /// <summary>执行一次挥砍：扇形判定 + 命中/挥空反馈。连击开启时自动推进段数。</summary>
         public void Swing()
         {
+            var loadout = GetComponent<WeaponLoadout>();
+            if (loadout != null && (loadout.IsSwitching || loadout.Current != WeaponKind.Sword)) return;
             // ---- 连击段推进 ----
             int step = 0;
             float interval = attackInterval;
             float dmgMul = 1f;
             float dur = swingDuration;
 
-            if (useCombo && comboDamageMul != null && comboDamageMul.Length >= 3)
+            if (useCombo && comboDamageMul != null && comboDamageMul.Length >= 3 &&
+                comboInterval != null && comboInterval.Length > 0 && comboDuration != null && comboDuration.Length > 0)
             {
                 bool chain = (Time.time - _lastSwingTime) <= comboWindow;
                 step = chain ? (ComboIndex + 1) % 3 : 0;
@@ -246,7 +250,9 @@ namespace MedusaHorror.Player
             }
             LastDamageMul = dmgMul;
 
-            _nextSwing = Time.time + Mathf.Max(0.05f, interval);
+            _activeSwingDuration = Mathf.Max(0.05f, dur);
+            float recovery = Mathf.Max(0f, interval - _activeSwingDuration);
+            _nextSwing = Time.time + Mathf.Max(0.05f, interval - recovery * 0.25f);
             _lastSwingTime = Time.time;
             SwingCount++;
             LastSwingTime = Time.time;
@@ -423,18 +429,13 @@ namespace MedusaHorror.Player
             if (!_bladeCaptured) CaptureBlade();
 
             _swingElapsed += Time.deltaTime;
-            float u = Mathf.Clamp01(_swingElapsed / Mathf.Max(0.05f, swingDuration));
+            float u = Mathf.Clamp01(_swingElapsed / _activeSwingDuration);
             bool hold = false;
 #if UNITY_EDITOR || MARVIS_DEBUG
             if (debugHoldPhase >= 0f) { u = Mathf.Clamp01(debugHoldPhase); hold = true; }
 #endif
 
             // 与 MeleeSwingBody 同相位的三段式：0~0.30 蓄力举剑，0.30~0.58 斜劈，0.58~1 收招
-            float q;
-            if (u < 0.30f) q = -EaseInOut(u / 0.30f);
-            else if (u < 0.58f) q = Mathf.Lerp(-1f, 1f, EaseInOut((u - 0.30f) / 0.28f));
-            else q = Mathf.Lerp(1f, 0f, EaseInOut((u - 0.58f) / 0.42f));
-
             // 剑身朝向按相位在世界空间直接给定（角色本地空间：x=右, y=上, z=前）
             // 起止点用「手骨当前姿态下的原始剑向」，保证起手/收招与待机姿势无缝衔接
             Vector3 restW = bladeRoot.parent != null
@@ -468,7 +469,8 @@ namespace MedusaHorror.Player
             if (bladeRoot == null) return;
             CaptureBlade();
             debugHoldPhase = Mathf.Clamp01(u);
-            _swingElapsed = debugHoldPhase * Mathf.Max(0.05f, swingDuration);
+            _activeSwingDuration = Mathf.Max(0.05f, swingDuration);
+            _swingElapsed = debugHoldPhase * _activeSwingDuration;
             if (_trail != null) _trail.emitting = false;
         }
 

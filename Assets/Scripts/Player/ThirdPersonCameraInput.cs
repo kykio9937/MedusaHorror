@@ -1,4 +1,5 @@
 using UnityEngine;
+using Cinemachine;
 
 namespace MedusaHorror.Player
 {
@@ -43,6 +44,17 @@ namespace MedusaHorror.Player
         float _targetPitch;
         float _pitchVelocity;
         float _recoil;
+        CinemachineVirtualCamera _virtualCamera;
+        CinemachineFramingTransposer _framing;
+        WeaponLoadout _loadout;
+        float _defaultDistance, _defaultScreenX, _defaultFov;
+        float _aimBlend;
+        Vector3 _defaultOffset, _defaultDamping;
+        Renderer[] _bodyRenderers;
+        UnityEngine.Rendering.ShadowCastingMode[] _bodyShadows;
+        bool _firstPerson;
+        float _perspectiveBlend;
+        public bool IsFirstPerson => _firstPerson;
 
         void Awake()
         {
@@ -51,10 +63,24 @@ namespace MedusaHorror.Player
 
             _targetPitch = Mathf.Clamp(initialPitch, minPitch, maxPitch);
             _pitch = _targetPitch;
+            _virtualCamera = GetComponent<CinemachineVirtualCamera>();
+            if (_virtualCamera != null)
+            {
+                _framing = _virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
+                _defaultFov = _virtualCamera.m_Lens.FieldOfView;
+                if (_framing != null)
+                {
+                    _defaultDistance = _framing.m_CameraDistance;
+                    _defaultScreenX = _framing.m_ScreenX;
+                    _defaultOffset = _framing.m_TrackedObjectOffset;
+                    _defaultDamping = new Vector3(_framing.m_XDamping, _framing.m_YDamping, _framing.m_ZDamping);
+                }
+            }
         }
 
         void Update()
         {
+            UpdateWeaponView();
             if (input != null)
             {
                 float delta = invertY ? input.Look.y : -input.Look.y;
@@ -75,6 +101,55 @@ namespace MedusaHorror.Player
                 _recoil -= back;
                 _targetPitch = Mathf.Clamp(_targetPitch + back, minPitch, maxPitch);
             }
+        }
+
+        void UpdateWeaponView()
+        {
+            if (_virtualCamera == null || _framing == null) return;
+            if (_loadout == null && input != null) _loadout = input.GetComponent<WeaponLoadout>();
+            bool firearm = _loadout != null && _loadout.Current != WeaponKind.Sword;
+            bool aiming = firearm && input != null && input.AimHeld && !_loadout.IsSwitching;
+            float blend = 1f - Mathf.Exp(-12f * Time.deltaTime);
+            _aimBlend = Mathf.Lerp(_aimBlend, aiming ? 1f : 0f, blend);
+            if (firearm != _firstPerson)
+            {
+                _firstPerson = firearm;
+            }
+            _perspectiveBlend = Mathf.MoveTowards(_perspectiveBlend, firearm ? 1f : 0f, Time.deltaTime / 0.3f);
+            float perspective = Mathf.SmoothStep(0f, 1f, _perspectiveBlend);
+            SetBodyVisibility(_perspectiveBlend < 0.8f);
+            _framing.m_ScreenX = Mathf.Lerp(_defaultScreenX, 0.5f, perspective);
+            _framing.m_CameraDistance = Mathf.Lerp(_defaultDistance, 0.05f, perspective);
+            Vector3 eyeOffset = input != null && _virtualCamera.Follow != null
+                ? _virtualCamera.Follow.InverseTransformPoint(input.transform.TransformPoint(new Vector3(0f, 1.75f, 0.08f)))
+                : _defaultOffset;
+            _framing.m_TrackedObjectOffset = Vector3.Lerp(_defaultOffset, eyeOffset, perspective);
+            bool transitioning = _perspectiveBlend > 0f && _perspectiveBlend < 1f;
+            _framing.m_XDamping = firearm || transitioning ? 0f : _defaultDamping.x;
+            _framing.m_YDamping = firearm || transitioning ? 0f : _defaultDamping.y;
+            _framing.m_ZDamping = firearm || transitioning ? 0f : _defaultDamping.z;
+            _virtualCamera.m_Lens.FieldOfView = Mathf.Lerp(_defaultFov, Mathf.Lerp(65f, 48f, _aimBlend), perspective);
+        }
+
+        void SetBodyVisibility(bool visible)
+        {
+            if (_bodyRenderers == null && input != null)
+            {
+                var animator = input.GetComponentInChildren<Animator>();
+                if (animator == null) return;
+                _bodyRenderers = animator.GetComponentsInChildren<Renderer>(true);
+                _bodyShadows = new UnityEngine.Rendering.ShadowCastingMode[_bodyRenderers.Length];
+                for (int i = 0; i < _bodyRenderers.Length; i++) _bodyShadows[i] = _bodyRenderers[i].shadowCastingMode;
+            }
+            if (_bodyRenderers == null) return;
+            for (int i = 0; i < _bodyRenderers.Length; i++)
+                if (_bodyRenderers[i] != null)
+                    _bodyRenderers[i].shadowCastingMode = visible ? _bodyShadows[i] : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+        }
+
+        void OnDisable()
+        {
+            SetBodyVisibility(true);
         }
 
         /// <summary>开火后坐：枪口上抬（俯仰角减小）并记录待回复量。</summary>

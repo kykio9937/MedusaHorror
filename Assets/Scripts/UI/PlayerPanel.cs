@@ -2,9 +2,14 @@
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using MedusaHorror.Core;
 using MedusaHorror.Gameplay;
 using MedusaHorror.Player;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
+#endif
 
 namespace MedusaHorror.UI
 {
@@ -54,6 +59,52 @@ namespace MedusaHorror.UI
         Image[] _slotHighlights;
         RectTransform _bodyRect;
         const int SlotCount = 9;
+        int _bagPage;
+        string _dropConfirmation;
+        GameObject _bagControls;
+        Text _bagPageText;
+        Button _useButton, _dropButton, _previousBag, _nextBag;
+        Text _dropLabel;
+        Image[] _filterImages;
+        bool _previousBlocked;
+        CursorLockMode _previousCursor;
+        bool _previousCursorVisible;
+
+        void OnEnable() { Inventory.Changed += OnInventoryChanged; }
+        void OnDisable() { Inventory.Changed -= OnInventoryChanged; Close(); }
+        void OnInventoryChanged() { if (_open) Refresh(); }
+
+        static bool KeyDown(KeyCode code)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            if (keyboard == null) return false;
+            if (code >= KeyCode.Alpha1 && code <= KeyCode.Alpha9)
+                return keyboard[(Key)((int)Key.Digit1 + (int)code - (int)KeyCode.Alpha1)].wasPressedThisFrame;
+            switch (code)
+            {
+                case KeyCode.Tab: return keyboard.tabKey.wasPressedThisFrame;
+                case KeyCode.Escape: return keyboard.escapeKey.wasPressedThisFrame;
+                case KeyCode.Q: return keyboard.qKey.wasPressedThisFrame;
+                case KeyCode.E: return keyboard.eKey.wasPressedThisFrame;
+                case KeyCode.F: return keyboard.fKey.wasPressedThisFrame;
+                case KeyCode.LeftArrow: return keyboard.leftArrowKey.wasPressedThisFrame;
+                case KeyCode.RightArrow: return keyboard.rightArrowKey.wasPressedThisFrame;
+            }
+            return false;
+#else
+            return Input.GetKeyDown(code);
+#endif
+        }
+
+        static bool ShiftHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+#else
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+#endif
+        }
 
         static readonly string[] PageNames = { "属性", "装备", "背包", "帮助" };
         static readonly string[] BagFilters = { "全部", "消耗", "材料", "任务", "钥匙", "纪念" };
@@ -82,33 +133,34 @@ namespace MedusaHorror.UI
         {
             if (!_shown) return;
 
-            if (Input.GetKeyDown(KeyCode.Tab))
+            if (KeyDown(KeyCode.Tab))
             {
                 if (_open) Close(); else Open();
                 return;
             }
             if (!_open) return;
 
-            if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
+            if (KeyDown(KeyCode.Escape)) { Close(); return; }
 
-            if (Input.GetKeyDown(KeyCode.Q)) { _page = (_page + PageNames.Length - 1) % PageNames.Length; Refresh(); return; }
-            if (Input.GetKeyDown(KeyCode.E)) { _page = (_page + 1) % PageNames.Length; Refresh(); return; }
+            if (KeyDown(KeyCode.Q)) { _page = (_page + PageNames.Length - 1) % PageNames.Length; Refresh(); return; }
+            if (KeyDown(KeyCode.E)) { _page = (_page + 1) % PageNames.Length; Refresh(); return; }
 
             // 背包页：F 切分类，数字键使用，Shift+数字丢弃
             if (_page == 2)
             {
-                if (Input.GetKeyDown(KeyCode.F))
+                if (KeyDown(KeyCode.F))
                 {
-                    _bagFilter = (_bagFilter + 1) % BagFilters.Length;
-                    Refresh();
+                    SelectFilter((_bagFilter + 1) % BagFilters.Length);
                     return;
                 }
-                bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                if (KeyDown(KeyCode.LeftArrow)) { ChangeBagPage(-1); return; }
+                if (KeyDown(KeyCode.RightArrow)) { ChangeBagPage(1); return; }
+                bool shift = ShiftHeld();
                 for (int i = 0; i < 9; i++)
                 {
-                    if (!Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
-                    _bagSel = i;
-                    if (shift) DropItem(i); else UseItem(i);
+                    if (!KeyDown((KeyCode)((int)KeyCode.Alpha1 + i))) continue;
+                    _bagSel = _bagPage * SlotCount + i;
+                    if (shift) DropItem(_bagSel); else UseItem(_bagSel);
                     return;
                 }
             }
@@ -116,6 +168,22 @@ namespace MedusaHorror.UI
 
         public void Open(int page = -1)
         {
+            if (EventSystem.current == null && FindObjectOfType<EventSystem>() == null)
+            {
+                var events = new GameObject("PlayerPanelEventSystem", typeof(EventSystem));
+                events.transform.SetParent(transform, false);
+#if ENABLE_INPUT_SYSTEM
+                events.AddComponent<InputSystemUIInputModule>();
+#else
+                events.AddComponent<StandaloneInputModule>();
+#endif
+            }
+            if (!_open)
+            {
+                _previousBlocked = InputReader.blocked;
+                _previousCursor = Cursor.lockState;
+                _previousCursorVisible = Cursor.visible;
+            }
             if (page >= 0) _page = Mathf.Clamp(page, 0, PageNames.Length - 1);
             _open = true;
             if (_bagSel < 0 && FilteredItems().Count > 0) _bagSel = 0;
@@ -130,10 +198,11 @@ namespace MedusaHorror.UI
         {
             if (!_open) return;
             _open = false;
-            InputReader.blocked = false;
+            InputReader.blocked = _previousBlocked;
             if (_canvas != null) _canvas.gameObject.SetActive(false);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            Cursor.lockState = _previousCursor;
+            Cursor.visible = _previousCursorVisible;
+            _dropConfirmation = null;
         }
 
         /// <summary>使用背包第 index 件物品。</summary>
@@ -159,7 +228,16 @@ namespace MedusaHorror.UI
                 LootToast.Show("「" + it.name + "」不能丢弃。");
                 return false;
             }
-            Inventory.Remove(it.id, 1);
+            if (_dropConfirmation != it.id)
+            {
+                _dropConfirmation = it.id;
+                _bagSel = index;
+                Refresh();
+                LootToast.Show("再次点击丢弃，确认丢弃「" + it.name + "」×1");
+                return false;
+            }
+            _dropConfirmation = null;
+            if (!Inventory.Remove(it.id, 1)) return false;
             LootToast.Show("丢掉了「" + it.name + "」×1");
             Refresh();
             return true;
@@ -182,19 +260,11 @@ namespace MedusaHorror.UI
                 if (pz.value <= 0.5f) { LootToast.Show("身上还没有石化痕迹，先留着。"); return false; }
 
                 float before = pz.value;
-                Inventory.Remove(it.id, 1);
+                if (!Inventory.Remove(it.id, 1)) return false;
                 pz.ReduceValue(pz.maxValue * 0.15f);
                 LootToast.Show("用掉一罐石英粉 · 石化 " + Mathf.RoundToInt(before) + " → " + Mathf.RoundToInt(pz.value));
                 var audio = AudioDirector.Instance;
                 if (audio != null) audio.PlayAt(SfxId.Pickup, transform.position, 0.8f, 1.05f);
-                Refresh();
-                return true;
-            }
-
-            if (it.kind == "消耗")
-            {
-                Inventory.Remove(it.id, 1);
-                LootToast.Show("用掉了「" + it.name + "」");
                 Refresh();
                 return true;
             }
@@ -222,16 +292,21 @@ namespace MedusaHorror.UI
 
             bool bag = _page == 2;
             if (_bagGrid != null) _bagGrid.gameObject.SetActive(bag);
+            if (_bagControls != null) _bagControls.SetActive(bag);
             if (_bodyRect != null)
             {
                 // 背包页把文字区压到下半屏，给 3×3 格子让位
                 if (bag)
                 {
-                    _bodyRect.offsetMin = new Vector2(240f, 108f);
-                    _bodyRect.offsetMax = new Vector2(-240f, -470f);
+                    _bodyRect.anchorMin = new Vector2(0.56f, 0.18f);
+                    _bodyRect.anchorMax = new Vector2(0.91f, 0.75f);
+                    _bodyRect.offsetMin = Vector2.zero;
+                    _bodyRect.offsetMax = Vector2.zero;
                 }
                 else
                 {
+                    _bodyRect.anchorMin = Vector2.zero;
+                    _bodyRect.anchorMax = Vector2.one;
                     _bodyRect.offsetMin = new Vector2(240f, 108f);
                     _bodyRect.offsetMax = new Vector2(-240f, -132f);
                 }
@@ -241,7 +316,7 @@ namespace MedusaHorror.UI
             if (_body != null) _body.text = BuildPage(_page);
             if (_hint != null)
                 _hint.text = _page == 2
-                    ? "点击格子或数字键 1-9 使用 · Shift+数字 丢弃 · F 切分类 · Q/E 换页 · Tab/Esc 关闭"
+                    ? "点击选择物品 · 数字键 1—9 使用 · ←/→ 翻页 · F 分类 · Tab/Esc 关闭"
                     : "Q / E 或点击页签切换 · Tab / Esc 关闭";
         }
 
@@ -249,17 +324,31 @@ namespace MedusaHorror.UI
         void FillBagGrid()
         {
             var list = FilteredItems();
+            int pages = Mathf.Max(1, Mathf.CeilToInt(list.Count / (float)SlotCount));
+            _bagPage = Mathf.Clamp(_bagPage, 0, pages - 1);
+            if (list.Count == 0) _bagSel = -1;
+            else _bagSel = Mathf.Clamp(_bagSel, _bagPage * SlotCount, Mathf.Min(list.Count - 1, (_bagPage + 1) * SlotCount - 1));
+            if (_bagPageText != null) _bagPageText.text = "第 " + (_bagPage + 1) + " / " + pages + " 页";
+            _previousBag.interactable = _bagPage > 0;
+            _nextBag.interactable = _bagPage + 1 < pages;
+            var selected = _bagSel >= 0 ? list[_bagSel] : null;
+            _useButton.interactable = selected != null && selected.id == "quartz";
+            _dropButton.interactable = selected != null && selected.kind != "任务" && selected.kind != "钥匙";
+            _dropLabel.text = selected != null && selected.id == _dropConfirmation ? "确认丢弃 ×1" : "丢弃 ×1";
+            for (int f = 0; f < _filterImages.Length; f++)
+                _filterImages[f].color = f == _bagFilter ? new Color(0.12f, 0.48f, 0.55f) : new Color(0.09f, 0.15f, 0.21f);
             for (int i = 0; i < SlotCount; i++)
             {
-                bool has = i < list.Count;
+                int index = _bagPage * SlotCount + i;
+                bool has = index < list.Count;
                 if (_slotIcons[i] != null)
                     _slotIcons[i].color = has
                         ? new Color(0.55f, 0.82f, 1f, 0.55f)
                         : new Color(0.50f, 0.60f, 0.70f, 0.16f);
                 if (_slotTexts[i] != null)
-                    _slotTexts[i].text = has ? (list[i].name + "\n×" + list[i].count) : "";
+                    _slotTexts[i].text = has ? ((i + 1) + "  [" + list[index].kind + "]\n" + list[index].name + "\n×" + list[index].count) : "";
                 if (_slotHighlights[i] != null)
-                    _slotHighlights[i].enabled = has && i == _bagSel;
+                    _slotHighlights[i].enabled = has && index == _bagSel;
             }
         }
 
@@ -341,13 +430,14 @@ namespace MedusaHorror.UI
             var sb = new StringBuilder();
             float dmgMul = PlayerStats.DamageMultiplier;
 
-            var loadout = FindObjectOfType<WeaponLoadout>(true);
-            string cur = loadout == null ? "石刃（近战）" : (loadout.Current == WeaponKind.Sword ? "石刃（近战）" : "旧式手枪");
+            var controller = FindObjectOfType<ThirdPersonController>();
+            var loadout = controller != null ? controller.GetComponent<WeaponLoadout>() : null;
+            string cur = loadout == null ? "石刃（近战）" : (loadout.Current == WeaponKind.Sword ? "石刃（近战）" : loadout.Current == WeaponKind.Rifle ? "脉冲步枪" : "科幻枪械");
             sb.AppendLine("装备        当前手持：" + cur);
             sb.AppendLine();
 
             // 有实例就用实时数值，没有就用标准值，保证任何场景都能看到完整装备
-            var melee = FindObjectOfType<MeleeWeapon>(true);
+            var melee = loadout != null ? loadout.sword : null;
             float meleeDmg = melee != null ? melee.damage : BaseMeleeDamage;
             float meleeRange = melee != null ? melee.attackRange : BaseMeleeRange;
             float meleeInterval = melee != null ? melee.attackInterval : BaseMeleeInterval;
@@ -359,14 +449,14 @@ namespace MedusaHorror.UI
             sb.AppendLine("  三段连击：斜劈 → 反手横扫 → 重斩（伤害 100% / 118% / 162%）");
             sb.AppendLine();
 
-            var gun = FindObjectOfType<PlayerWeapon>(true);
+            var gun = loadout != null ? (loadout.Current == WeaponKind.Rifle ? loadout.rifle : loadout.gun) : null;
             float gunDmg = gun != null ? gun.damage : BaseGunDamage;
             float gunRange = gun != null ? gun.range : BaseGunRange;
             float gunReload = gun != null ? gun.reloadTime : BaseGunReload;
             int gunMag = gun != null ? gun.MagazineSize : BaseGunMag;
             int gunReserve = gun != null ? gun.ReserveAmmo : BaseGunReserve;
 
-            sb.AppendLine("远程 · 旧式手枪");
+            sb.AppendLine("远程 · 科幻枪械");
             sb.AppendLine("  伤害 " + gunDmg.ToString("F0") + "  →  实际 " + Mathf.RoundToInt(gunDmg * dmgMul));
             sb.AppendLine("  弹匣 " + gunMag + " · 备弹 " + gunReserve + " · 射程 " + gunRange.ToString("F0") + " m · 换弹 " + gunReload.ToString("F2") + " s");
             sb.AppendLine();
@@ -402,14 +492,8 @@ namespace MedusaHorror.UI
             var sb = new StringBuilder();
             var list = FilteredItems();
 
-            var ft = new StringBuilder();
-            for (int i = 0; i < BagFilters.Length; i++)
-            {
-                if (i > 0) ft.Append(" · ");
-                ft.Append(i == _bagFilter ? "【" + BagFilters[i] + "】" : BagFilters[i]);
-            }
-            sb.AppendLine("背包   " + ft);
-            sb.AppendLine("共 " + Inventory.Items.Count + " 种 · " + Inventory.TotalCount + " 件　（F 切换分类）");
+            sb.AppendLine("物品详情");
+            sb.AppendLine("共 " + Inventory.Items.Count + " 种 · " + Inventory.TotalCount + " 件");
             sb.AppendLine();
 
             if (list.Count == 0)
@@ -427,16 +511,16 @@ namespace MedusaHorror.UI
                 if (_bagSel >= 0 && _bagSel < list.Count)
                 {
                     var sel = list[_bagSel];
-                    sb.AppendLine("已选 [" + (_bagSel + 1) + "]  [" + sel.kind + "]  " + sel.name + " ×" + sel.count);
+                    sb.AppendLine(sel.name + " ×" + sel.count);
+                    sb.AppendLine("分类　" + sel.kind);
                     if (!string.IsNullOrEmpty(sel.desc)) sb.AppendLine("  " + sel.desc);
                     sb.AppendLine();
-                    sb.AppendLine("数字键或点击格子使用 · Shift+数字丢弃（任务物品和钥匙不能丢）");
+                    sb.AppendLine(sel.id == "quartz" ? "使用后降低 15% 最大石化值。" : sel.kind == "任务" || sel.kind == "钥匙" ? "任务所需物品，已保护，无法丢弃。" : "此物品无法直接使用。");
                 }
                 else
                 {
                     sb.AppendLine("点击格子或按数字键 1-9 选择物品。");
                 }
-                if (list.Count > 9) sb.AppendLine("……还有 " + (list.Count - 9) + " 种未显示");
                 return sb.ToString();
             }
 
@@ -462,13 +546,15 @@ namespace MedusaHorror.UI
             sb.AppendLine("空格         跳跃（购买义体后可二段跳）");
             sb.AppendLine("鼠标         视角 / 转身");
             sb.AppendLine("鼠标左键     攻击 / 射击");
+            sb.AppendLine("鼠标右键     按住瞄准（持枪时）");
             sb.AppendLine("R            换弹");
             sb.AppendLine("1 / 2        切换武器");
             sb.AppendLine("E            交互（拾取、对话、传送门、商店、快速旅行）");
             sb.AppendLine("Tab          本面板（打开时角色停止操作）");
             sb.AppendLine("Q / E        面板内切换页签");
             sb.AppendLine("F            背包内切换分类（消耗/材料/任务/钥匙/纪念）");
-            sb.AppendLine("Shift+数字   丢弃背包物品");
+            sb.AppendLine("← / →        背包物品翻页");
+            sb.AppendLine("Shift+数字   请求丢弃，再按一次确认");
             sb.AppendLine("B            在自己家里布置家具");
             sb.AppendLine("Esc          关闭面板 / 打开游戏菜单");
             sb.AppendLine();
@@ -485,6 +571,7 @@ namespace MedusaHorror.UI
             _canvas = go.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.sortingOrder = 200;
+            go.AddComponent<GraphicRaycaster>();
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -505,6 +592,7 @@ namespace MedusaHorror.UI
             BuildTabs(go.transform, font);
             BuildArrows(go.transform);
             BuildBagGrid(go.transform, font);
+            BuildBagControls(go.transform, font);
 
             _body = MakeText(go.transform, font, 28, TextAnchor.UpperLeft,
                 new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
@@ -513,6 +601,7 @@ namespace MedusaHorror.UI
             _bodyRect.offsetMin = new Vector2(240f, 108f);
             _bodyRect.offsetMax = new Vector2(-240f, -132f);
             _body.lineSpacing = 1.22f;
+            _body.raycastTarget = false;
 
             _hint = MakeText(go.transform, font, 26, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(1200f, 50f),
@@ -569,7 +658,7 @@ namespace MedusaHorror.UI
                 var rt = a.GetComponent<RectTransform>();
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = new Vector2(d * 86f, 0f);
+                rt.anchoredPosition = new Vector2(d * 850f, 0f);
                 rt.sizeDelta = new Vector2(84f, 84f);
                 rt.localRotation = Quaternion.Euler(0f, 0f, d < 0 ? 90f : -90f);
 
@@ -599,10 +688,10 @@ namespace MedusaHorror.UI
             var grid = new GameObject("BagGrid", typeof(RectTransform));
             grid.transform.SetParent(parent, false);
             _bagGrid = grid.GetComponent<RectTransform>();
-            _bagGrid.anchorMin = _bagGrid.anchorMax = new Vector2(0.5f, 0.5f);
+            _bagGrid.anchorMin = _bagGrid.anchorMax = new Vector2(0.30f, 0.5f);
             _bagGrid.pivot = new Vector2(0.5f, 0.5f);
             _bagGrid.sizeDelta = new Vector2(cols * cw + (cols - 1) * gap, rows * ch + (rows - 1) * gap);
-            _bagGrid.anchoredPosition = new Vector2(0f, 70f);
+            _bagGrid.anchoredPosition = new Vector2(0f, -5f);
 
             _slotIcons = new Image[SlotCount];
             _slotTexts = new Text[SlotCount];
@@ -654,10 +743,80 @@ namespace MedusaHorror.UI
                 var btn = s.AddComponent<Button>();
                 btn.targetGraphic = bgImg;
                 btn.transition = Selectable.Transition.None;
-                btn.onClick.AddListener(delegate { _bagSel = idx; Refresh(); });
+                btn.onClick.AddListener(delegate { _bagSel = _bagPage * SlotCount + idx; _dropConfirmation = null; Refresh(); });
             }
 
             grid.SetActive(false);
+        }
+
+        void SelectFilter(int index)
+        {
+            _bagFilter = index;
+            _bagPage = 0;
+            _bagSel = 0;
+            _dropConfirmation = null;
+            Refresh();
+        }
+
+        void ChangeBagPage(int direction)
+        {
+            int pages = Mathf.Max(1, Mathf.CeilToInt(FilteredItems().Count / (float)SlotCount));
+            _bagPage = Mathf.Clamp(_bagPage + direction, 0, pages - 1);
+            _bagSel = _bagPage * SlotCount;
+            _dropConfirmation = null;
+            Refresh();
+        }
+
+        Button BagButton(Transform parent, Font font, string label, Vector2 anchor, Vector2 position, Vector2 size)
+        {
+            var obj = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
+            obj.transform.SetParent(parent, false);
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.anchoredPosition = position;
+            rt.sizeDelta = size;
+            var background = obj.GetComponent<Image>();
+            background.color = new Color(0.09f, 0.22f, 0.29f);
+            var button = obj.GetComponent<Button>();
+            button.targetGraphic = background;
+            var colors = button.colors;
+            colors.disabledColor = new Color(0.35f, 0.35f, 0.35f, 0.45f);
+            button.colors = colors;
+            var text = MakeText(obj.transform, font, 24, TextAnchor.MiddleCenter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, Color.white);
+            text.text = label;
+            text.raycastTarget = false;
+            return button;
+        }
+
+        void BuildBagControls(Transform parent, Font font)
+        {
+            _bagControls = new GameObject("BagControls", typeof(RectTransform));
+            _bagControls.transform.SetParent(parent, false);
+            var rect = _bagControls.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            _filterImages = new Image[BagFilters.Length];
+            for (int i = 0; i < BagFilters.Length; i++)
+            {
+                int filter = i;
+                var button = BagButton(rect, font, BagFilters[i], new Vector2(0.3f, 0.82f), new Vector2((i - 2.5f) * 112f, 0), new Vector2(104, 48));
+                button.onClick.AddListener(() => SelectFilter(filter));
+                _filterImages[i] = button.GetComponent<Image>();
+            }
+            _previousBag = BagButton(rect, font, "上一页", new Vector2(0.3f, 0.20f), new Vector2(-215, 0), new Vector2(130, 48));
+            _previousBag.onClick.AddListener(() => ChangeBagPage(-1));
+            _nextBag = BagButton(rect, font, "下一页", new Vector2(0.3f, 0.20f), new Vector2(215, 0), new Vector2(130, 48));
+            _nextBag.onClick.AddListener(() => ChangeBagPage(1));
+            _bagPageText = MakeText(rect, font, 24, TextAnchor.MiddleCenter, new Vector2(0.3f, 0.20f), new Vector2(0.3f, 0.20f), Vector2.zero, new Vector2(220, 48), Color.white);
+            _useButton = BagButton(rect, font, "使用物品", new Vector2(0.64f, 0.22f), Vector2.zero, new Vector2(210, 58));
+            _useButton.onClick.AddListener(() => { _dropConfirmation = null; UseItem(_bagSel); });
+            _dropButton = BagButton(rect, font, "丢弃 ×1", new Vector2(0.80f, 0.22f), Vector2.zero, new Vector2(210, 58));
+            _dropButton.onClick.AddListener(() => DropItem(_bagSel));
+            _dropLabel = _dropButton.GetComponentInChildren<Text>();
+            var close = BagButton(rect, font, "关闭", new Vector2(0.91f, 0.93f), Vector2.zero, new Vector2(110, 48));
+            close.onClick.AddListener(Close);
+            _bagControls.SetActive(false);
         }
 
 

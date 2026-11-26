@@ -15,8 +15,7 @@ namespace MedusaHorror.EditorTools
     public static class MainMenuBuilder
     {
         public const string MenuAssetPath = "Assets/Scenes/MainMenu.unity";
-        public const string HospitalPath = "Assets/Scenes/W1_Hospital.unity";
-        public const string SandboxPath = "Assets/Scenes/W1_Sandbox.unity";
+        public const string FirstLevelPath = "Assets/Scenes/W2_Wasteland.unity";
 
         [MenuItem("MedusaHorror/P0/Build Main Menu Scene")]
         public static void BuildMenuFromMenu()
@@ -59,7 +58,7 @@ namespace MedusaHorror.EditorTools
 
             var menuGo = new GameObject("MainMenuScreen");
             var screen = menuGo.AddComponent<MainMenuScreen>();
-            screen.gameScene = "W1_Hospital";
+            screen.gameScene = "W2_Wasteland";
 
             bool saved = EditorSceneManager.SaveScene(scene, MenuAssetPath);
             string order = ApplyBuildOrder();
@@ -74,13 +73,18 @@ namespace MedusaHorror.EditorTools
             return (saved ? "OK" : "SAVE_FAIL") + ": MainMenu -> " + MenuAssetPath + " | " + order;
         }
 
-        /// <summary>Build Settings 顺序：0=MainMenu，1=W1_Hospital，2=W1_Sandbox。</summary>
+        /// <summary>Build Settings 顺序：保留现有场景，剔除已移除的医院场景，主菜单置首。</summary>
         public static string ApplyBuildOrder()
         {
             var list = new List<EditorBuildSettingsScene>();
             if (File.Exists(MenuAssetPath)) list.Add(new EditorBuildSettingsScene(MenuAssetPath, true));
-            if (File.Exists(HospitalPath)) list.Add(new EditorBuildSettingsScene(HospitalPath, true));
-            if (File.Exists(SandboxPath)) list.Add(new EditorBuildSettingsScene(SandboxPath, true));
+            foreach (var s in EditorBuildSettings.scenes)
+            {
+                if (s.path == MenuAssetPath) continue;
+                if (s.path.EndsWith("W1_Hospital.unity")) continue;
+                if (s.path.EndsWith("W1_Sandbox.unity")) continue;
+                list.Add(s);
+            }
             EditorBuildSettings.scenes = list.ToArray();
 
             var sb = new System.Text.StringBuilder();

@@ -30,6 +30,8 @@ namespace MedusaHorror.Player
         public static Vector2 debugMove;
         public static bool debugFire;
         public static bool debugRun;
+        public static bool debugAim;
+        public bool AimHeld { get; private set; }
         public static bool debugReload;
         /// <summary>一次性换弹脉冲（编辑器诊断命令用，读取后自动清零）。</summary>
         public static bool debugReloadPulse;
@@ -113,11 +115,13 @@ namespace MedusaHorror.Player
             bool sk1 = false;
             bool sk2 = false;
             bool ready = false;
+            bool aim = false;
 
             if (debugOverrideEnabled)
             {
                 move = debugMove;
                 run = debugRun;
+                aim = debugAim;
                 fire = debugFire;
                 reload = debugReload || debugReloadPulse;
                 interact = debugInteractPulse;
@@ -156,6 +160,7 @@ namespace MedusaHorror.Player
 
             if (ms != null)
             {
+                aim = ms.rightButton.isPressed && Cursor.lockState == CursorLockMode.Locked;
                 Vector2 delta = ms.delta.ReadValue();
                 look = new Vector2(delta.x, delta.y) * lookSensitivity;
 
@@ -175,6 +180,7 @@ namespace MedusaHorror.Player
                 look = Vector2.zero;
                 run = jump = interact = fire = reload = w1 = w2 = w3 = swap = false;
                 sk1 = sk2 = false;
+                aim = false;
             }
 
             if (move.sqrMagnitude > 1f) move.Normalize();
@@ -182,6 +188,7 @@ namespace MedusaHorror.Player
             Move = move;
             Look = look;
             RunHeld = run;
+            AimHeld = aim;
             JumpPressed = jump;
             InteractPressed = interact;
             FirePressed = fire;

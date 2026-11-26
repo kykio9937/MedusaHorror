@@ -52,6 +52,14 @@ namespace MedusaHorror.Player
         [Header("动画速度平滑")]
         public float animationSpeedDamp = 0.08f;
 
+        [Header("步幅校准（消除脚底打滑）")]
+        [Tooltip("Walk 动画在 playbackSpeed=1 时的自然前进速度（米/秒），用于换算播放速度")]
+        public float animWalkSpeed = 1.58f;
+        [Tooltip("Run 动画在 playbackSpeed=1 时的自然前进速度（米/秒）")]
+        public float animRunSpeed = 3.28f;
+        [Tooltip("关闭则动画固定按 1 倍速播放")]
+        public bool matchAnimationToSpeed = true;
+
         CharacterController _cc;
         Animator _anim;
         MedusaHorror.Gameplay.PlayerPetrify _petrify;
@@ -64,6 +72,7 @@ namespace MedusaHorror.Player
         int _airJumpsUsed;
         float _animSpeed;
         float _animSpeedVelocity;
+        float _movementSpeedScale = 1f;
         float _lastGroundedTime;
 
         bool _hasSpeedParam;
@@ -91,6 +100,7 @@ namespace MedusaHorror.Player
         {
             if (_cc == null) _cc = GetComponent<CharacterController>();
             if (_anim == null) _anim = GetComponent<Animator>();
+            if (_anim == null) _anim = GetComponentInChildren<Animator>(true);
             if (input == null) input = GetComponent<InputReader>();
             if (_petrify == null) _petrify = GetComponent<MedusaHorror.Gameplay.PlayerPetrify>();
 
@@ -138,12 +148,13 @@ namespace MedusaHorror.Player
             bool hasInput = moveInput.sqrMagnitude > 0.01f;
 
             // 目标速度：有输入时按 Shift 在走/跑之间切换；任务奖励的移速加成在这里生效
+            float petrifyScale = (_petrify != null && _petrify.IsHalfPetrified) ? 0.6f : 1f;
+            _movementSpeedScale = MedusaHorror.Core.PlayerStats.SpeedMultiplier * petrifyScale * externalSpeedScale;
             float targetSpeed = 0f;
             if (hasInput)
             {
                 // 半石化（>=70%）移动减速，玩家能直观感到"身体在僵硬"
-                float petrifyScale = (_petrify != null && _petrify.IsHalfPetrified) ? 0.6f : 1f;
-                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * MedusaHorror.Core.PlayerStats.SpeedMultiplier * petrifyScale * externalSpeedScale;
+                targetSpeed = (input.RunHeld ? runSpeed : walkSpeed) * _movementSpeedScale;
             }
 
             float rate = _planarSpeed < targetSpeed ? acceleration : deceleration;
@@ -226,8 +237,25 @@ namespace MedusaHorror.Player
             if (suspended) planar = Mathf.Min(planar, runSpeed);
             _animSpeed = Mathf.SmoothDamp(_animSpeed, planar, ref _animSpeedVelocity, animationSpeedDamp);
 
-            if (_hasSpeedParam) _anim.SetFloat(speedParam, _animSpeed);
+            // Blend thresholds describe the unmodified walk/run speeds. Stat bonuses and
+            // status effects change the cadence without selecting a different gait.
+            float blendSpeed = suspended ? _animSpeed :
+                (_movementSpeedScale > 0.001f ? _animSpeed / _movementSpeedScale : 0f);
+            if (_hasSpeedParam) _anim.SetFloat(speedParam, blendSpeed);
             if (_hasGroundedParam) _anim.SetBool(groundedParam, suspended || _cc.isGrounded);
+
+            // 让动画播放速度随实际移速缩放：脚落地时的位移与动画步幅一致，才不会"滑行"。
+            if (matchAnimationToSpeed && !suspended)
+            {
+                float natural = Mathf.Lerp(animWalkSpeed, animRunSpeed, Mathf.InverseLerp(walkSpeed, runSpeed, blendSpeed));
+                float scale = _animSpeed > 0.15f ? _animSpeed / Mathf.Max(0.2f, natural) : 1f;
+                _anim.speed = Mathf.Clamp(scale, 0.55f, 1.75f);
+            }
+            else
+            {
+                _anim.speed = 1f;
+            }
         }
     }
 }
+

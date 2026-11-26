@@ -93,17 +93,16 @@ namespace MedusaHorror.EditorTools
             // ---------- 五关传送门 ----------
             var gates = new[]
             {
-                new GateDef("W1_Hospital", "1 · 废弃医院", new Color(0.55f, 0.88f, 0.95f, 0.45f)),
-                new GateDef("W2_Wasteland", "2 · 城市废墟", new Color(1f, 0.62f, 0.28f, 0.45f)),
-                new GateDef("W3_Subway", "3 · 地下铁", new Color(0.82f, 0.90f, 0.45f, 0.45f)),
-                new GateDef("W4_NeonStreet", "4 · 霓虹街区", new Color(0.95f, 0.32f, 0.86f, 0.45f)),
-                new GateDef("W5_AlienGate", "5 · 外星星门", new Color(0.62f, 0.48f, 1f, 0.45f)),
+                new GateDef("W2_Wasteland", "1 · 城市废墟", new Color(1f, 0.62f, 0.28f, 0.45f)),
+                new GateDef("W3_Subway", "2 · 地下铁", new Color(0.82f, 0.90f, 0.45f, 0.45f)),
+                new GateDef("W4_NeonStreet", "3 · 霓虹街区", new Color(0.95f, 0.32f, 0.86f, 0.45f)),
+                new GateDef("W5_AlienGate", "4 · 外星星门", new Color(0.62f, 0.48f, 1f, 0.45f)),
             };
 
             var font = MedusaHorror.UI.CjkFont.Get();
             for (int i = 0; i < gates.Length; i++)
             {
-                float a = (90f + i * 72f) * Mathf.Deg2Rad;
+                float a = (90f + i * (360f / gates.Length)) * Mathf.Deg2Rad;
                 var p = new Vector3(Mathf.Cos(a) * 12f, 0f, Mathf.Sin(a) * 12f);
                 float yaw = Mathf.Atan2(-p.x, -p.z) * Mathf.Rad2Deg;
 

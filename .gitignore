@@ -61,3 +61,14 @@ unity_restart.log
 backup/
 unity_prev.log
 regress_run.log
+
+# 4GB third-party environment bundle imported by mistake (not referenced by our scenes)
+/Assets/beffio/
+
+# Local editor database and recovery snapshots
+/_Deleted_20261123/
+/_LibDbBak3/
+/_Trash_db_20261124b/
+/_SceneBackup_20261123/
+/_SceneBackup_Swap/
+

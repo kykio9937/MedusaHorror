@@ -67,6 +67,7 @@ namespace MedusaHorror.Player
 
         Transform _muzzle;
         Transform _holder;
+        Transform _rightGrip, _leftGrip;
         Light _flash;
         InputReader _input;
         ThirdPersonCameraInput _camInput;
@@ -103,43 +104,112 @@ namespace MedusaHorror.Player
         public float CrosshairGap { get; private set; }
 
         int _ammo;
+        WeaponLoadout _loadout;
+        public bool IsAiming => inputEnabled && _input != null && _input.AimHeld && (_loadout == null || !_loadout.IsSwitching);
+        public Transform GripTarget => _holder;
+        public Transform RightGrip => _rightGrip != null ? _rightGrip : _holder;
+        public Transform LeftGrip => _leftGrip;
 
         void Start()
         {
+            _loadout = GetComponentInParent<WeaponLoadout>();
             _input = GetComponent<InputReader>();
             if (_input == null) _input = GetComponentInParent<InputReader>();
             if (viewCamera == null) viewCamera = Camera.main;
             magazineSize += MedusaHorror.Core.Progression.LevelMagBonus;   // 等级解锁的弹匣扩容
             _ammo = magazineSize;
             BuildRig();
+            SetActiveState(inputEnabled);
         }
+
+        [Header("枪模")]
+        [Tooltip("外置枪模（FBX/预制体）。留空则用程序化方块枪")]
+        public GameObject gunModel;
+        public Material gunMaterial;
+        [Tooltip("枪模长度（米），用于自动缩放")]
+        public float gunModelLength = 0.34f;
 
         void BuildRig()
         {
             var holder = new GameObject("WeaponRig");
             holder.transform.SetParent(transform, false);
-            holder.transform.localPosition = new Vector3(0.26f, 1.32f, 0.34f);
-            holder.transform.localRotation = Quaternion.Euler(0f, -6f, 0f);
+            holder.transform.localPosition = new Vector3(0.12f, 1.53f, 0.14f);
+            holder.transform.localRotation = Quaternion.identity;
             _holder = holder.transform;
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            body.name = "Pistol_Body";
-            body.transform.SetParent(holder.transform, false);
-            body.transform.localScale = new Vector3(bodyWidth, bodyHeight, bodyLength);
-            KillCollider(body);
-            Paint(body, bodyColor);
+            float muzzleZ = bodyLength * 0.57f;
+            float muzzleY = 0.01f;
 
-            var grip = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            grip.name = "Pistol_Grip";
-            grip.transform.SetParent(holder.transform, false);
-            grip.transform.localPosition = new Vector3(0f, -0.11f, -0.08f);
-            grip.transform.localScale = new Vector3(0.06f, 0.14f, 0.09f);
-            KillCollider(grip);
-            Paint(grip, gripColor);
+            if (gunModel != null)
+            {
+                var inst = Instantiate(gunModel, holder.transform, false);
+                inst.name = "GunModel";
+                inst.transform.localPosition = Vector3.zero;
+                inst.transform.localRotation = Quaternion.identity;
+                inst.transform.localScale = Vector3.one;
+                _rightGrip = inst.transform.Find("RightGrip");
+                _leftGrip = inst.transform.Find("LeftGrip");
+
+                var rends = inst.GetComponentsInChildren<Renderer>(true);
+                if (_rightGrip == null && rends.Length > 0)
+                {
+                    Bounds b = rends[0].bounds;
+                    for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                    float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+                    if (longest > 0.0001f)
+                    {
+                        float sc = gunModelLength / longest;
+                        inst.transform.localScale = Vector3.one * sc;
+                    }
+                    // 把最长轴转到 +Z（枪管朝前），再按包围盒把枪身对到握把位置
+                    if (b.size.x >= b.size.y && b.size.x >= b.size.z)
+                        inst.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+                    else if (b.size.y >= b.size.z)
+                        inst.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                    rends = inst.GetComponentsInChildren<Renderer>(true);
+                    b = rends[0].bounds;
+                    for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                    // localPosition lives in the holder's space, so convert the world bounds centre there
+                    Vector3 center = holder.transform.InverseTransformPoint(b.center);
+                    inst.transform.localPosition = new Vector3(-center.x, -center.y + bodyHeight * 0.15f, -center.z + bodyLength * 0.10f);
+                    muzzleZ = (b.max.z - holder.transform.position.z) + 0.02f;
+                    muzzleY = 0.01f;
+                }
+                if (_rightGrip == null && gunMaterial != null)
+                {
+                    foreach (var r in inst.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mats = new Material[r.sharedMaterials.Length];
+                        for (int i = 0; i < mats.Length; i++) mats[i] = gunMaterial;
+                        r.sharedMaterials = mats;
+                    }
+                }
+                foreach (var c in inst.GetComponentsInChildren<Collider>(true)) Destroy(c);
+            }
+            else
+            {
+                var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                body.name = "Pistol_Body";
+                body.transform.SetParent(holder.transform, false);
+                body.transform.localScale = new Vector3(bodyWidth, bodyHeight, bodyLength);
+                KillCollider(body);
+                Paint(body, bodyColor);
+
+                var grip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                grip.name = "Pistol_Grip";
+                grip.transform.SetParent(holder.transform, false);
+                grip.transform.localPosition = new Vector3(0f, -0.11f, -0.08f);
+                grip.transform.localScale = new Vector3(0.06f, 0.14f, 0.09f);
+                KillCollider(grip);
+                Paint(grip, gripColor);
+            }
 
             var muzzleGo = new GameObject("Muzzle");
             muzzleGo.transform.SetParent(holder.transform, false);
-            muzzleGo.transform.localPosition = new Vector3(0f, 0.01f, bodyLength * 0.57f);
+            muzzleGo.transform.localPosition = new Vector3(0f, muzzleY, muzzleZ);
+            var authoredMuzzle = holder.transform.Find("GunModel/Muzzle");
+            if (authoredMuzzle != null) muzzleGo.transform.position = authoredMuzzle.position;
             _muzzle = muzzleGo.transform;
 
             _flash = muzzleGo.AddComponent<Light>();
@@ -297,14 +367,30 @@ namespace MedusaHorror.Player
             if (_recoilKick > 0f) _recoilKick = Mathf.Max(0f, _recoilKick - Time.deltaTime * 7.5f);
             if (_holder != null)
             {
-                _holder.localPosition = new Vector3(0.26f, 1.32f, 0.34f - 0.055f * _recoilKick);
-                _holder.localRotation = Quaternion.Euler(-7.5f * _recoilKick, -6f, 0f);
+                _holder.localPosition = new Vector3(0.12f, 1.53f, 0.14f - 0.035f * _recoilKick);
+                if (viewCamera != null)
+                {
+                    if (_camInput == null) _camInput = FindObjectOfType<ThirdPersonCameraInput>();
+                    if (inputEnabled && _camInput != null && _camInput.IsFirstPerson)
+                        _holder.position = viewCamera.transform.TransformPoint(IsAiming
+                            ? new Vector3(0.035f, -0.18f, 0.34f - 0.035f * _recoilKick)
+                            : new Vector3(0.17f, -0.24f, 0.30f - 0.035f * _recoilKick));
+                    Vector3 aimPoint = viewCamera.transform.position + viewCamera.transform.forward * range;
+                    _holder.rotation = Quaternion.LookRotation(aimPoint - _holder.position, transform.up) *
+                        Quaternion.Euler(-7.5f * _recoilKick, 0f, 0f);
+                    if (_loadout != null && _loadout.IsSwitching)
+                    {
+                        float stow = _loadout.StowAmount;
+                        _holder.position += viewCamera.transform.TransformVector(new Vector3(0.10f, -0.65f, -0.18f)) * stow;
+                        _holder.rotation *= Quaternion.Euler(65f * stow, 10f * stow, -15f * stow);
+                    }
+                }
             }
 
             // 扩散回落
             if (_spread > spreadBase)
                 _spread = Mathf.Max(spreadBase, _spread - spreadRecoverPerSecond * Time.deltaTime);
-            UpdateCrosshair(_spread);
+            UpdateCrosshair(_spread * (IsAiming ? 0.4f : 1f));
 
             // 换弹推进
             if (_reloadElapsed >= 0f)
@@ -345,6 +431,7 @@ namespace MedusaHorror.Player
         /// <summary>手动 / 自动换弹（R 键或空仓自动触发）。</summary>
         public void TryReload()
         {
+            if (_loadout != null && (_loadout.IsSwitching || !inputEnabled)) return;
             if (_reloadElapsed >= 0f) return;
             if (_ammo >= magazineSize) return;
             if (reserveAmmo <= 0) return;
@@ -356,6 +443,7 @@ namespace MedusaHorror.Player
 
         void TryFire()
         {
+            if (_loadout != null && (_loadout.IsSwitching || !inputEnabled)) return;
             if (_reloadElapsed >= 0f) return;
 
             var audio = MedusaHorror.Core.AudioDirector.Instance;
@@ -400,7 +488,7 @@ namespace MedusaHorror.Player
             dir.Normalize();
             if (_spread > 0.001f)
             {
-                float rad = _spread * Mathf.Deg2Rad * Mathf.Sqrt(Random.value);
+                float rad = _spread * (IsAiming ? 0.4f : 1f) * Mathf.Deg2Rad * Mathf.Sqrt(Random.value);
                 float ang = Random.value * Mathf.PI * 2f;
                 Vector3 offset = (viewCamera.transform.right * Mathf.Cos(ang) + viewCamera.transform.up * Mathf.Sin(ang)) * Mathf.Tan(rad);
                 dir = (dir + offset).normalized;
