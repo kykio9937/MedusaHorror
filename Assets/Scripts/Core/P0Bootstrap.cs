@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using MedusaHorror.UI;
@@ -35,6 +35,8 @@ namespace MedusaHorror.Core
 
         static void Apply(Scene scene)
         {
+            CampaignRoute.Apply(scene);
+            SceneGuidance.Enter(scene);
             // P0-1 UI 中文字体
             int fixedText = CjkFont.Apply();
             if (fixedText > 0)
@@ -52,7 +54,7 @@ namespace MedusaHorror.Core
             }
 
             // P0-2 失败 / 重开闭环：战斗关卡都需要局内流程中枢
-            if (scene.name == BaseScene || scene.name == WastelandScene
+            if (scene.name == CampaignRoute.City || scene.name == BaseScene || scene.name == WastelandScene
                 || scene.name == SubwayScene || scene.name == NeonStreetScene || scene.name == AlienGateScene)
                 GameFlow.Ensure();
 
@@ -64,7 +66,7 @@ namespace MedusaHorror.Core
 
             // 新手引导：首次进入 W1 自动播放操作提示（H 键随时重看）
             MedusaHorror.Gameplay.TutorialDirector.Ensure();
-            MedusaHorror.Gameplay.TutorialDirector.MaybeShowOnW1(scene.name);
+            // 医院苏醒演出结束后再开始操作提示。
 
             // 每次进入关卡都从「未拿钥匙、Boss 未死」开始，避免基地往返后门禁残留
             MedusaHorror.Gameplay.ExitPortal.ResetStaticState();
@@ -93,10 +95,11 @@ namespace MedusaHorror.Core
             for (int i = 0; i < portals.Length; i++)
                 if (portals[i] != null) PortalFrame.Ensure(portals[i]);
 
-            // 小地图 + 传送门导航罗盘（W1 医院继续用专用 MinimapRig，这里自动跳过）
+            // 全关卡统一小地图与实时区域信息。
             LevelMinimap.Ensure(scene.name);
-            if (scene.name == WastelandScene && SaveSystem.Data.hospitalTrainingPassed)
-                new GameObject("TrainingArrivalStory").AddComponent<TrainingArrival>();
+            if (scene.name == CampaignRoute.City)
+                new GameObject("StrongholdArrival").AddComponent<StrongholdArrival>();
+            if (scene.name == WastelandScene) new GameObject("WildPatrolDirector").AddComponent<WildPatrolDirector>();
             PortalCompass.Ensure();
 
             // 信用点 + 任务追踪 HUD（主菜单隐藏）
@@ -115,6 +118,8 @@ namespace MedusaHorror.Core
 
             // 玩家外观配色（V 键切换，不改骨骼与武器绑定）
             var pcSkin = Object.FindObjectOfType<MedusaHorror.Player.ThirdPersonController>(true);
+            if(pcSkin!=null && pcSkin.GetComponent<MedusaHorror.Player.FirstPersonArms>()==null)pcSkin.gameObject.AddComponent<MedusaHorror.Player.FirstPersonArms>();
+            if(pcSkin!=null && pcSkin.GetComponent<MedusaHorror.Player.FirstPersonSword>()==null)pcSkin.gameObject.AddComponent<MedusaHorror.Player.FirstPersonSword>();
             if (pcSkin != null && pcSkin.GetComponent<MedusaHorror.Player.PlayerSkin>() == null)
                 pcSkin.gameObject.AddComponent<MedusaHorror.Player.PlayerSkin>();
 
@@ -261,8 +266,8 @@ namespace MedusaHorror.Core
             string title;
             switch (scene.name)
             {
-                case WastelandScene: title = "第一章 · 穿过荒废村庄 · 找到村口传送门"; break;
-                case SubwayScene: title = "第二章 · 登上地铁列车 · 前往霓虹街区"; break;
+                case WastelandScene: title = "野外巡防 · 探索旧村庄，平安返回堡垒"; break;
+                case SubwayScene: title = "列车中转站 · 选择目的地并购票上车"; break;
                 case NeonStreetScene: title = "第三章 · 探索商店与义体门诊 · 前往离场星门"; break;
                 default: title = "终章 · 抵达外星星门 · 离开这颗星球"; break;
             }
@@ -379,7 +384,7 @@ namespace MedusaHorror.Core
             if (LevelObjective.Active != null) return;
             var root = new GameObject("LevelObjectiveRuntime");
             var objective = root.AddComponent<LevelObjective>();
-            objective.objectiveTitle = "序章 · 在医院中搜寻 5 件线索 · 激活星门";
+            objective.objectiveTitle = "寻找出路 · 搜寻五件线索，打开北侧通道";
 
             var spots = new (string label, Vector3 pos)[]
             {

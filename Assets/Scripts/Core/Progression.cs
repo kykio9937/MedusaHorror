@@ -36,6 +36,7 @@ namespace MedusaHorror.Core
             new Unlock { level = 10, id = "blade",      name = "裂空斩",     desc = "近战伤害 +12%" },
             new Unlock { level = 12, id = "resist2",    name = "抗石膜",     desc = "石化抗性 +12%" },
             new Unlock { level = 15, id = "vitality",   name = "强健体魄",   desc = "移速 +5%，石化上限 +10" },
+            new Unlock { level = 20, id = "station_access", name = "远行许可", desc = "荒原堡垒交通门开放，可前往列车中转站" },
         };
 
         public static int Level { get { return Mathf.Clamp(SaveSystem.Data.level, 1, MaxLevel); } }

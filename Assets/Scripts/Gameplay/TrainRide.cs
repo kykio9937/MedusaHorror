@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using MedusaHorror.Core;
 using MedusaHorror.Player;
 
@@ -387,7 +387,7 @@ namespace MedusaHorror.Gameplay
             _arriving = false;
             TeleportPlayer(transform.TransformPoint(boardPoint));
             AudioDirector.Instance?.Play(SfxId.DoorOpen, 0.7f, 0.9f);
-            UI.StoryBanner.Show("列车启动", "气密门合拢，窗外的霓虹被拉成一道道流光。", 3.2f);
+            UI.StoryBanner.Show("列车启动", "气密门合拢。目的地：" + SceneLoader.DisplayName(nextScene) + "。窗外的灯光开始后退。", 3.2f);
         }
 
         public void Leave()
@@ -402,9 +402,9 @@ namespace MedusaHorror.Gameplay
         /// <summary>到站：淡出后切到下一关（霓虹街区）。</summary>
         System.Collections.IEnumerator ArriveRoutine()
         {
-            UI.StoryBanner.Show("到站", "列车减速，霓虹街区的灯牌在车窗外铺开。", 2.6f);
+            UI.StoryBanner.Show("到站", "列车减速。" + SceneLoader.DisplayName(nextScene) + "即将抵达。", 2.6f);
             yield return new WaitForSeconds(2.6f);
-            if (Riding) SceneLoader.Load(nextScene, "霓虹街区");
+            if (Riding) SceneLoader.Load(nextScene, SceneLoader.DisplayName(nextScene));
         }
 
         void TeleportPlayer(Vector3 world)
@@ -505,10 +505,7 @@ namespace MedusaHorror.Gameplay
         {
             get
             {
-                if (TrainRide.Instance != null && TrainRide.Instance.Riding) return "列车 · 已在车上";
-                  if (fare <= 0) return "列车 · 免费前往霓虹街区（E）";
-                  if (Wallet.CanAfford(fare)) return "列车 · 上车（" + fare + " 信用点，E）";
-                  return "列车 · 车票 " + fare + " 信用点，还差 " + Mathf.Max(0, fare - Wallet.Coins) + " · 可探索站台赚取";
+                return TrainRide.Instance != null && TrainRide.Instance.Riding ? "列车 · 已在车上" : "列车 · 选择目的地（车票 " + fare + " 信用点起）";
             }
         }
 
@@ -517,13 +514,7 @@ namespace MedusaHorror.Gameplay
         public void Interact()
         {
             if (TrainRide.Instance != null && TrainRide.Instance.Riding) return;
-            if (!Wallet.Spend(fare))
-            {
-                UI.StoryBanner.Show("信用点不足", "车票 " + fare + " 信用点，还差 " + Mathf.Max(0, fare - Wallet.Coins) + "。可先探索站台遭遇，赚取车费。", 3.5f);
-                return;
-            }
-            var t = TrainRide.Ensure(stationReturn);
-            t.Board();
+            TrainDestinationPanel.Open(stationReturn, fare);
         }
     }
 

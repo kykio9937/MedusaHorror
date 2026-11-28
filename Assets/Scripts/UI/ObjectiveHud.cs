@@ -6,7 +6,7 @@ using MedusaHorror.Core;
 namespace MedusaHorror.UI
 {
     /// <summary>
-    /// 关卡目标提示 HUD：左上角显示当前关卡目标与完成进度。
+    /// 右侧短暂显示当前目标与完成进度，更新进度时再次显示。
     /// 不依赖场景序列化，场景加载后自动挂载。
     /// </summary>
     public class ObjectiveHud : MonoBehaviour
@@ -20,6 +20,8 @@ namespace MedusaHorror.UI
         Text _titleText;
         Text _progressText;
         Image _barBg;
+        Image _cardBackground;
+        float _visibleUntil;
         Image _barFill;
         Text _levelText;
 
@@ -68,12 +70,13 @@ namespace MedusaHorror.UI
             _group.interactable = false;
 
             var cardRt = NewRect("ObjectiveCard", canvasGo.transform);
-            cardRt.anchorMin = new Vector2(0.5f, 1f);
-            cardRt.anchorMax = new Vector2(0.5f, 1f);
+            cardRt.anchorMin = new Vector2(0.73f, 0.3f);
+            cardRt.anchorMax = new Vector2(0.73f, 0.3f);
             cardRt.pivot = new Vector2(0.5f, 1f);
             cardRt.sizeDelta = new Vector2(440f, 132f);
             cardRt.anchoredPosition = new Vector2(0f, -14f);
             var bg = cardRt.gameObject.AddComponent<Image>();
+            _cardBackground = bg;
             bg.color = new Color(0.06f, 0.06f, 0.07f, 0.72f);
             bg.raycastTarget = false;
 
@@ -132,7 +135,8 @@ namespace MedusaHorror.UI
             txt.font = font;
             txt.fontSize = size;
             txt.alignment = TextAnchor.MiddleLeft;
-            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.horizontalOverflow = HorizontalWrapMode.Wrap;
+            txt.resizeTextForBestFit = true; txt.resizeTextMinSize = 18; txt.resizeTextMaxSize = size;
             txt.verticalOverflow = VerticalWrapMode.Overflow;
             txt.raycastTarget = false;
             return txt;
@@ -155,17 +159,24 @@ namespace MedusaHorror.UI
             _flashTimer = 0f;
 
             var scene = SceneManager.GetActiveScene();
-            _levelText.text = SceneLoader.DisplayName(scene.name);
+            var theme = SceneNoticeTheme.For(scene.name);
+            _levelText.text = theme.category;
+            _levelText.color = theme.accent;
+            _cardBackground.sprite = theme.Background;
+            _cardBackground.color = new Color(0.12f, 0.14f, 0.15f, 0.96f);
             _titleText.text = _title;
             _titleText.color = new Color(0.94f, 0.90f, 0.84f, 1f);
-            _barColor = new Color(0.85f, 0.62f, 0.28f, 1f);
+            _barColor = theme.accent;
             _barFill.color = _barColor;
             RefreshProgress();
             _group.alpha = 1f;
+            _visibleUntil = Time.unscaledTime + 6f;
         }
 
         public void SetProgress(int current, int total)
         {
+            _visibleUntil = Time.unscaledTime + 6f;
+            _group.alpha = 1f;
             _current = current;
             if (total >= 0) _total = total;
             RefreshProgress();
@@ -182,6 +193,8 @@ namespace MedusaHorror.UI
             _barFill.color = _barColor;
             RefreshProgress();
             _flashTimer = 1.6f;
+            _visibleUntil = Time.unscaledTime + 6f;
+            _group.alpha = 1f;
 
             var audio = AudioDirector.Instance;
             if (audio != null) audio.Play(SfxId.Pickup, 0.9f, 1.15f);
@@ -190,6 +203,7 @@ namespace MedusaHorror.UI
         public void Hide()
         {
             _group.alpha = 0f;
+            _visibleUntil = 0f;
         }
 
         void RefreshProgress()
@@ -211,6 +225,10 @@ namespace MedusaHorror.UI
 
         void Update()
         {
+            if(MedusaHorror.Player.InputReader.blocked || MedusaHorror.Core.SceneLoader.IsLoading){_group.alpha=0;return;}
+            if(_visibleUntil>Time.unscaledTime)_group.alpha=1;
+            if (_visibleUntil > 0 && Time.unscaledTime > _visibleUntil)
+                _group.alpha = Mathf.MoveTowards(_group.alpha, 0, Time.unscaledDeltaTime * 2f);
             if (_flashTimer > 0f)
             {
                 _flashTimer -= Time.unscaledDeltaTime;

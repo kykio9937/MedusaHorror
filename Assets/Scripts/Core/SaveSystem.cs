@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -99,6 +99,12 @@ namespace MedusaHorror.Core
         [Tooltip("W1 操作引导是否已播放过")]
         public bool tutorialDone = false;
         public bool hospitalTrainingPassed;
+        public bool captainBriefingDone;
+        public bool thirdPersonTrainingUnlocked;
+        public List<string> hospitalJournal=new List<string>();
+        public bool firstWildPatrolDone;
+        public bool firstWildPatrolAccepted;
+        public bool firstWildPatrolClaimed;
 
         [Header("角色成长")]
         public int level = 1;
@@ -218,7 +224,9 @@ namespace MedusaHorror.Core
             _data.savedAtTicks = DateTime.Now.Ticks;
             try
             {
-                File.WriteAllText(SlotPath(_currentSlot), JsonUtility.ToJson(_data, true));
+                string path=SlotPath(_currentSlot),temporary=path+".tmp";
+                File.WriteAllText(temporary, JsonUtility.ToJson(_data, true));
+                if(File.Exists(path))File.Replace(temporary,path,path+".bak");else File.Move(temporary,path);
                 File.WriteAllText(ActiveSlotPath, _currentSlot.ToString());
             }
             catch (Exception e)
@@ -246,6 +254,12 @@ namespace MedusaHorror.Core
             PlayerPrefs.Save();
         }
 
+        public static void RestoreSnapshot(string json)
+        {
+            var restored=JsonUtility.FromJson<SaveData>(json);
+            if(restored==null)throw new InvalidDataException("存档内容无效");
+            Normalize(restored);_data=restored;_loaded=true;ApplyPrefs(_data);Save();
+        }
         static SaveData ReadSlotFile(int slot)
         {
             if (slot < 1 || slot > SlotCount) return null;
@@ -253,7 +267,9 @@ namespace MedusaHorror.Core
             {
                 string path = SlotPath(slot);
                 if (!File.Exists(path)) return null;
-                var parsed = JsonUtility.FromJson<SaveData>(File.ReadAllText(path));
+                SaveData parsed=null;
+                try{parsed=JsonUtility.FromJson<SaveData>(File.ReadAllText(path));}
+                catch{if(File.Exists(path+".bak"))parsed=JsonUtility.FromJson<SaveData>(File.ReadAllText(path+".bak"));}
                 if (parsed == null) return null;
                 Normalize(parsed);
                 return parsed;
@@ -267,6 +283,7 @@ namespace MedusaHorror.Core
 
         static void Normalize(SaveData d)
         {
+            if(d.hospitalJournal==null)d.hospitalJournal=new List<string>();
             if (d.levels == null) d.levels = new List<LevelRecord>();
             if (d.activatedPortals == null) d.activatedPortals = new List<string>();
             if (d.quests == null) d.quests = new List<QuestState>();
@@ -394,10 +411,11 @@ namespace MedusaHorror.Core
         public static void StartNewGame(int slot)
         {
             if (slot < 1 || slot > SlotCount) slot = DefaultSlot;
-            try { if (File.Exists(SlotPath(slot))) File.Delete(SlotPath(slot)); }
+            try { if (File.Exists(SlotPath(slot))) File.Delete(SlotPath(slot)); if(File.Exists(SlotPath(slot)+".bak"))File.Delete(SlotPath(slot)+".bak"); }
             catch (Exception e) { Debug.LogWarning("[SaveSystem] 覆盖旧档失败：" + e.Message); }
 
             _currentSlot = slot;
+            CheckpointSystem.ClearForSlot(slot);
             _data = new SaveData();
             _loaded = true;
             Save();
@@ -412,6 +430,8 @@ namespace MedusaHorror.Core
             {
                 string path = SlotPath(slot);
                 if (File.Exists(path)) File.Delete(path);
+                if(File.Exists(path+".bak"))File.Delete(path+".bak");
+                CheckpointSystem.ClearForSlot(slot);
 
                 if (slot == _currentSlot)
                 {
@@ -491,6 +511,7 @@ namespace MedusaHorror.Core
 
         public static void ResetAll()
         {
+            CheckpointSystem.ClearForSlot(CurrentSlot);
             _data = new SaveData();
             _loaded = true;
             Save();

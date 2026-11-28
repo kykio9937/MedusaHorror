@@ -107,8 +107,9 @@ namespace MedusaHorror.Player
         {
             if (_virtualCamera == null || _framing == null) return;
             if (_loadout == null && input != null) _loadout = input.GetComponent<WeaponLoadout>();
-            bool firearm = _loadout != null && _loadout.Current != WeaponKind.Sword;
-            bool aiming = firearm && input != null && input.AimHeld && !_loadout.IsSwitching;
+            if (PlayerViewMode.TogglePressed()) PlayerViewMode.Toggle(_loadout);
+            bool firearm = PlayerViewMode.IsFirstPerson;
+            bool aiming = firearm && _loadout != null && _loadout.Current != WeaponKind.Sword && input != null && input.AimHeld && !_loadout.IsSwitching;
             float blend = 1f - Mathf.Exp(-12f * Time.deltaTime);
             _aimBlend = Mathf.Lerp(_aimBlend, aiming ? 1f : 0f, blend);
             if (firearm != _firstPerson)
@@ -149,7 +150,7 @@ namespace MedusaHorror.Player
 
         void OnDisable()
         {
-            SetBodyVisibility(true);
+            SetBodyVisibility(!PlayerViewMode.IsFirstPerson);
         }
 
         /// <summary>开火后坐：枪口上抬（俯仰角减小）并记录待回复量。</summary>

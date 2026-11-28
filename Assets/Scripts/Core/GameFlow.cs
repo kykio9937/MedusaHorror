@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using MedusaHorror.Gameplay;
 using MedusaHorror.Player;
 using MedusaHorror.UI;
@@ -175,6 +175,7 @@ namespace MedusaHorror.Core
         public void Fail(string title, string subtitle)
         {
             if (State == RunState.Failed) return;
+            SetExtraButtons(false);
             State = RunState.Failed;
             Panel = "Failed";
             panelTimer = 0f;
@@ -182,9 +183,9 @@ namespace MedusaHorror.Core
 
             titleText.text = string.IsNullOrEmpty(title) ? "你被石化了" : title;
             subText.text = BuildFailStats(subtitle);
-            hintText.text = "按 R 重新开始　·　按 Q 退出游戏";
-            ConfigureButtons("重新开始 (R)", Restart, "退出游戏 (Q)", QuitGame);
-            ConfigureThird(null, null, false);
+            hintText.text = "选择读取检查点、重新开始本关或返回主菜单";
+            ConfigureButtons("读取存档", LoadCheckpoint, "重新开始本关", Restart);
+            ConfigureThird("返回主菜单", ToMenu, true);
 
             FreezePlayer();
             CaptureLensTargets();
@@ -300,10 +301,11 @@ namespace MedusaHorror.Core
             panelTimer = -1f;
 
             titleText.text = "已暂停";
-            subText.text = "石化的凝视暂时凝固 · 按 ESC 继续前行";
-            hintText.text = "按 ESC 继续　·　按 R 重新开始　·　按 Q 退出游戏";
-            ConfigureButtons("继续游戏 (ESC)", Resume, "返回主菜单 (M)", ToMenu);
-            ConfigureThird("设置", OpenSettings, true);
+            subText.text = CheckpointSystem.Description;
+            hintText.text = "ESC 继续 · 检查点保存当前位置、物品与探索状态";
+            ConfigureButtons("继续游戏", Resume, "保存检查点", SaveCheckpoint);
+            ConfigureThird("读取存档", LoadCheckpoint, true);
+            SetExtraButtons(true);
 
             if (vignette != null) vignette.color = new Color(0.03f, 0.03f, 0.04f, 0.55f);
             if (group != null) { group.alpha = 1f; group.blocksRaycasts = true; group.interactable = true; }
@@ -315,6 +317,7 @@ namespace MedusaHorror.Core
 
         public void Resume()
         {
+            SetExtraButtons(false);
             if (State != RunState.Paused) return;
             State = RunState.Running;
             Panel = "";
@@ -373,6 +376,7 @@ namespace MedusaHorror.Core
 
         public void Restart()
         {
+            CheckpointSystem.RequestRestart();
             Time.timeScale = 1f;
             State = RunState.Running;
             Panel = "";
@@ -534,7 +538,7 @@ namespace MedusaHorror.Core
             if (State == RunState.Won && kb[advanceKey].wasPressedThisFrame) { ContinueRun(); return true; }
             if (kb[restartKey].wasPressedThisFrame) { Restart(); return true; }
             if (State == RunState.Failed && quitKey != Key.None && kb[quitKey].wasPressedThisFrame) { QuitGame(); return true; }
-            if (State == RunState.Won && kb[menuKey].wasPressedThisFrame) { ToMenu(); return true; }
+            if ((State == RunState.Won || State == RunState.Failed) && kb[menuKey].wasPressedThisFrame) { ToMenu(); return true; }
             return false;
         }
 
@@ -640,6 +644,20 @@ namespace MedusaHorror.Core
             }
         }
 
+        Button _saveMenu,_returnMenu;
+        void SaveCheckpoint(){if(CheckpointSystem.Capture("手动存档")){subText.text=CheckpointSystem.Description;MedusaHorror.Gameplay.LootToast.Show("检查点已保存");}}
+        public void LoadCheckpoint()
+        {
+            if(!CheckpointSystem.HasCheckpoint){subText.text="暂无可读取的检查点";return;}
+            Time.timeScale=1;State=RunState.Running;Panel="";panelTimer=-1;_leaving=false;
+            if(group!=null){group.alpha=0;group.blocksRaycasts=false;group.interactable=false;}
+            SetExtraButtons(false);SetPlayerActive(true);CheckpointSystem.Load();
+        }
+        void SetExtraButtons(bool shown)
+        {
+            if(_saveMenu!=null)_saveMenu.gameObject.SetActive(shown);
+            if(_returnMenu!=null)_returnMenu.gameObject.SetActive(shown);
+        }
         // ---------------- UI ----------------
 
         void ConfigureButtons(string label1, UnityEngine.Events.UnityAction action1,
@@ -712,37 +730,41 @@ namespace MedusaHorror.Core
             cardRt.anchorMin = new Vector2(0.5f, 0.5f);
             cardRt.anchorMax = new Vector2(0.5f, 0.5f);
             cardRt.pivot = new Vector2(0.5f, 0.5f);
-            cardRt.sizeDelta = new Vector2(760f, 320f);
+            cardRt.sizeDelta = new Vector2(860f, 540f);
             cardRt.anchoredPosition = Vector2.zero;
             card = cardRt.gameObject.AddComponent<Image>();
             card.color = new Color(0.07f, 0.06f, 0.07f, 0.94f);
 
             Font font = CjkFont.Get();
 
-            titleText = NewText("FlowTitle", cardRt, font, 56, new Vector2(0f, 92f), new Vector2(720f, 72f));
+            titleText = NewText("FlowTitle", cardRt, font, 56, new Vector2(0f, 188f), new Vector2(720f, 72f));
             // 初始面板是隐藏的，标题留空；真实文案一律由 Fail/Win/Pause 在显示时赋值
             titleText.text = string.Empty;
             titleText.color = new Color(0.93f, 0.86f, 0.78f, 1f);
             titleText.fontStyle = FontStyle.Bold;
 
-            subText = NewText("FlowSub", cardRt, font, 24, new Vector2(0f, 22f), new Vector2(700f, 40f));
+            subText = NewText("FlowSub", cardRt, font, 24, new Vector2(0f, 97f), new Vector2(760f, 90f));
             subText.text = "石化值已满 · 美杜莎的凝视将你凝固成石";
             subText.color = new Color(0.86f, 0.83f, 0.79f, 0.92f);
 
-            hintText = NewText("FlowHint", cardRt, font, 22, new Vector2(0f, -44f), new Vector2(700f, 36f));
+            hintText = NewText("FlowHint", cardRt, font, 22, new Vector2(0f, 23f), new Vector2(700f, 36f));
             hintText.text = "按 R 重新开始　·　按 Q 退出游戏";
             hintText.color = new Color(0.80f, 0.76f, 0.70f, 0.85f);
 
             // 三枚按钮横向排布：胜利态左键为「继续前进」，中间返回主菜单，右侧重开本关。
-            btn1 = NewButton("BtnPrimary", cardRt, font, "重新开始 (R)", new Vector2(-238f, -118f),
+            btn1 = NewButton("BtnPrimary", cardRt, font, "重新开始 (R)", new Vector2(-260f, -80f),
                 new Color(0.36f, 0.20f, 0.18f, 0.96f), out btn1Label);
-            btn2 = NewButton("BtnSecondary", cardRt, font, "退出游戏 (Q)", new Vector2(0f, -118f),
+            btn2 = NewButton("BtnSecondary", cardRt, font, "退出游戏 (Q)", new Vector2(0f, -80f),
                 new Color(0.18f, 0.18f, 0.20f, 0.96f), out btn2Label);
-            btn3 = NewButton("BtnTertiary", cardRt, font, "重开本关 (R)", new Vector2(238f, -118f),
+            btn3 = NewButton("BtnTertiary", cardRt, font, "重开本关 (R)", new Vector2(260f, -80f),
                 new Color(0.20f, 0.22f, 0.26f, 0.96f), out btn3Label);
             ConfigureThird(null, null, false);
             ConfigureButtons("重新开始 (R)", Restart, "退出游戏 (Q)", QuitGame);
 
+            Text extraLabel;
+            _saveMenu=NewButton("Settings",cardRt,font,"设置",new Vector2(-140,-172),new Color(0.08f,0.18f,0.22f),out extraLabel);_saveMenu.onClick.AddListener(OpenSettings);
+            _returnMenu=NewButton("ReturnMenu",cardRt,font,"返回主菜单",new Vector2(140,-172),new Color(0.08f,0.18f,0.22f),out extraLabel);_returnMenu.onClick.AddListener(ToMenu);
+            SetExtraButtons(false);MenuTheme.Apply(cardRt);
             canvasGo.SetActive(true);
         }
 

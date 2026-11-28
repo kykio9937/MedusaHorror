@@ -129,21 +129,11 @@ namespace MedusaHorror.EditorTools
 
         static void Sign(Transform root, string label, Vector3 position, Vector3 viewer)
         {
-            var obj = new GameObject("RouteSign");
-            obj.transform.SetParent(root,false);
-            obj.transform.position = position;
-            Vector3 direction = position - viewer;
-            direction.y = 0;
-            if (direction.sqrMagnitude > 0.01f) obj.transform.rotation = Quaternion.LookRotation(direction);
-            var text = obj.AddComponent<TextMesh>();
-            text.font = MedusaHorror.UI.CjkFont.Get();
-            text.fontSize = 64;
-            text.characterSize = 0.045f;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.text = label;
-            var material = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/W1Hospital/SignLettering.mat");
-            obj.GetComponent<Renderer>().sharedMaterial = material;
+            var lines = label.Split('\n');
+            if (new[] { "荒废村庄", "废弃地铁", "霓虹街区", "异星之门" }.Contains(lines[0])) return;
+            var obj = new GameObject("RouteNotice"); obj.transform.SetParent(root,false); obj.transform.position=position;
+            var notice = obj.AddComponent<ProximityNotice>(); notice.title=lines[0];
+            notice.description=string.Join("\n",lines.Skip(1));notice.radius=7;notice.verticalOffset=2.5f;
         }
 
         static void AddSupply(Transform root, Vector3 point)

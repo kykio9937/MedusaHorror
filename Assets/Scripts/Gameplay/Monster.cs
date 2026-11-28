@@ -348,9 +348,7 @@ namespace MedusaHorror.Gameplay
             var pz = player.GetComponentInParent<PlayerPetrify>();
             if (pz != null && !pz.dead)
             {
-                float resist = PlayerStats.PetrifyResist;
-                float add = damage * (1f - resist);
-                pz.value = Mathf.Min(pz.maxValue, pz.value + add);
+                pz.ApplyImpact(damage);
                 var audio = AudioDirector.Instance;
                 if (audio != null) audio.PlayAt(SfxId.PetrifyLoop, transform.position, 0.35f, 1.1f);
                 if (kind == Kind.Spitter) SpawnBolt(player.position);
@@ -384,6 +382,7 @@ namespace MedusaHorror.Gameplay
         public void TakeDamage(float amount)
         {
             if (_dead || amount <= 0f) return;
+            MedusaHorror.UI.CombatNumbers.Show(transform.position+Vector3.up*1.6f,Mathf.Min(Health,amount));
             Health -= amount;
             _hitFlash = 0.14f;
             _staggerUntil = Time.time + 0.18f;

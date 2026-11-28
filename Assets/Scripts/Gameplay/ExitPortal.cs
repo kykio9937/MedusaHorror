@@ -85,7 +85,7 @@ namespace MedusaHorror.Gameplay
             get
             {
                 if (requireHospitalClues && !W1ObjectiveState.Complete) return "医院线索 " + W1ObjectiveState.Count + "/" + W1ObjectiveState.Total + " · 集齐后启动";
-                if (requireBossDefeat && !s_bossDefeated) return "模拟训练尚未通过 · 击败二楼守卫";
+                if (requireBossDefeat && !s_bossDefeated) return "天台通道尚未开放 · 二楼还有危险";
                 if (requireActivation && !Activated) return "点亮传送门";
                 int fare = MedusaHorror.Core.Pricing.Apply(cost);
                 if (fare > 0)
@@ -226,8 +226,10 @@ namespace MedusaHorror.Gameplay
 
         void BeginLeave()
         {
-            _leaving = true;
             string next = ResolveNextScene();
+            if (!CampaignRoute.CanTravel(SceneManager.GetActiveScene().name, next, out var reason))
+            { if(Time.unscaledTime-_warnAt>2.5f){_warnAt=Time.unscaledTime;LootToast.Show(reason);} return; }
+            _leaving = true;
             string label = string.IsNullOrEmpty(next) ? MedusaHorror.Core.GameFlow.MenuScene : next;
 
             int fare = MedusaHorror.Core.Pricing.Apply(cost);
@@ -238,7 +240,7 @@ namespace MedusaHorror.Gameplay
             }
             else
             {
-                LootToast.Show("离场 · " + label);
+                LootToast.Show(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == CampaignRoute.Trial ? "光线正在吞没视野……" : "离场 · " + SceneLoader.DisplayName(label));
             }
 
             Debug.Log("[Exit] 玩家走入传送门，开始离场 → " + label + (cost > 0 ? "（花费 " + cost + "）" : ""));

@@ -46,16 +46,23 @@ namespace MedusaHorror.Player
         public MeleeSwingBody swingBody;
 
         [Header("三段连击")]
-        [Tooltip("开启后连续点击会依次打出三段不同招式")]
+        [Tooltip("按住左键依次打出最多三段；松开停止追加")]
         public bool useCombo = true;
         [Tooltip("每段伤害倍率（相对 damage）")]
         public float[] comboDamageMul = { 1f, 1.18f, 1.62f };
-        [Tooltip("每段最小间隔（秒），越靠后越慢")]
+        [Tooltip("旧版序列化兼容字段；实际间隔为挥砍时长加该段后摇")]
         public float[] comboInterval = { 0.40f, 0.44f, 0.74f };
         [Tooltip("每段挥砍时长（秒）")]
         public float[] comboDuration = { 0.34f, 0.36f, 0.52f };
         [Tooltip("上一段结束后多久内点击算续招")]
         public float comboWindow = 0.85f;
+        public static float RecoveryForStep(int step) => step == 0 ? .3f : step == 1 ? .7f : 1.2f;
+        public float RecoveryDuration => RecoveryForStep(LastComboStep);
+        public bool IsRecovering => SwingCount > 0 && Time.time >= LastSwingTime + _activeSwingDuration && Time.time < _nextSwing;
+        public float Recovery01 => Mathf.Clamp01((Time.time - LastSwingTime - _activeSwingDuration) / RecoveryDuration);
+        public float ActiveSwingDuration => _activeSwingDuration;
+        public bool IsSwinging => SwingCount > 0 && Time.time < LastSwingTime + _activeSwingDuration;
+        bool _holdChain;
 
         [Header("开关")]
         public bool inputEnabled = true;
@@ -70,7 +77,7 @@ namespace MedusaHorror.Player
         public float CooldownRemaining { get { return Mathf.Max(0f, _nextSwing - Time.time); } }
         public float Cooldown01
         {
-            get { return attackInterval <= 0.001f ? 0f : Mathf.Clamp01(CooldownRemaining / attackInterval); }
+            get { return Mathf.Clamp01(CooldownRemaining / Mathf.Max(.05f, _activeSwingDuration + RecoveryDuration)); }
         }
         public int SwingCount { get; private set; }
         public int TotalHits { get; private set; }
@@ -93,9 +100,11 @@ namespace MedusaHorror.Player
 
         TrailRenderer _trail;
         float _nextSwing;
-        float _lastSwingTime = -999f;
         float _swingElapsed = -1f;
         float _activeSwingDuration;
+        bool _hitPending;
+        float _hitAt, _pendingDamageMul, _pendingDuration;
+        int _pendingStep;
         Quaternion _bladeBaseRot;
         Vector3 _bladeBasePos;
         bool _bladeCaptured;
@@ -187,6 +196,14 @@ namespace MedusaHorror.Player
         void Update()
         {
             UpdateSwingAnimation();
+            if (_hitPending && Time.time >= _hitAt)
+            {
+                _hitPending = false;
+                var equipment = GetComponent<WeaponLoadout>();
+                var state = GameFlow.Instance;
+                if (inputEnabled && (state == null || state.IsRunning) && (equipment == null || (!equipment.IsSwitching && equipment.Current == WeaponKind.Sword)))
+                    ResolveSwingHit(_pendingStep, _pendingDamageMul, _pendingDuration);
+            }
 
             var flow = GameFlow.Instance;
             bool flowRunning = flow == null || flow.IsRunning;
@@ -210,7 +227,19 @@ namespace MedusaHorror.Player
 #endif
             if (inputEnabled && input != null)
             {
-                fire = flowRunning && input.FirePressed;
+                var loadout = GetComponent<WeaponLoadout>();
+                bool valid = flowRunning && !InputReader.blocked && (Cursor.lockState == CursorLockMode.Locked || InputReader.debugOverrideEnabled)
+                    && (loadout == null || (!loadout.IsSwitching && loadout.Current == WeaponKind.Sword));
+                if (!valid) { _holdChain = false; return; }
+                if (!input.FireHeld) _holdChain = false;
+                if (input.FirePressed && Ready)
+                {
+                    _holdChain = input.FireHeld;
+                    BeginSwing(0);
+                }
+                else if (_holdChain && input.FireHeld && Ready && useCombo && LastComboStep < 2)
+                    BeginSwing(LastComboStep + 1);
+                return;
             }
 
             if (!fire) return;
@@ -222,22 +251,25 @@ namespace MedusaHorror.Player
         /// <summary>执行一次挥砍：扇形判定 + 命中/挥空反馈。连击开启时自动推进段数。</summary>
         public void Swing()
         {
+            BeginSwing(-1);
+        }
+        void BeginSwing(int requestedStep)
+        {
+            if (!Ready) return;
             var loadout = GetComponent<WeaponLoadout>();
             if (loadout != null && (loadout.IsSwitching || loadout.Current != WeaponKind.Sword)) return;
             // ---- 连击段推进 ----
             int step = 0;
-            float interval = attackInterval;
             float dmgMul = 1f;
             float dur = swingDuration;
 
             if (useCombo && comboDamageMul != null && comboDamageMul.Length >= 3 &&
                 comboInterval != null && comboInterval.Length > 0 && comboDuration != null && comboDuration.Length > 0)
             {
-                bool chain = (Time.time - _lastSwingTime) <= comboWindow;
-                step = chain ? (ComboIndex + 1) % 3 : 0;
+                bool chain = SwingCount > 0 && Time.time <= _nextSwing + comboWindow;
+                step = requestedStep >= 0 ? requestedStep : chain ? (ComboIndex + 1) % 3 : 0;
                 ComboIndex = step;
                 LastComboStep = step;
-                interval = comboInterval[Mathf.Clamp(step, 0, comboInterval.Length - 1)];
                 dmgMul = comboDamageMul[Mathf.Clamp(step, 0, comboDamageMul.Length - 1)];
                 dur = comboDuration[Mathf.Clamp(step, 0, comboDuration.Length - 1)];
                 _curWind = ComboWindDirs[step];
@@ -251,14 +283,24 @@ namespace MedusaHorror.Player
             LastDamageMul = dmgMul;
 
             _activeSwingDuration = Mathf.Max(0.05f, dur);
-            float recovery = Mathf.Max(0f, interval - _activeSwingDuration);
-            _nextSwing = Time.time + Mathf.Max(0.05f, interval - recovery * 0.25f);
-            _lastSwingTime = Time.time;
+            _nextSwing = Time.time + _activeSwingDuration + RecoveryDuration;
             SwingCount++;
             LastSwingTime = Time.time;
             _swingElapsed = 0f;
             CaptureBlade();
             if (_trail != null) { _trail.Clear(); _trail.emitting = true; }
+
+            // 攻击片段已从完整动作中拆出，原0.42命中点按拆分长度换算。
+            _hitPending = true; _hitAt = Time.time + _activeSwingDuration * (.42f / (step == 2 ? .61f : .59f));
+            _pendingStep = step; _pendingDamageMul = dmgMul; _pendingDuration = dur;
+            LastSwingTargets = 0; LastSwingDamage = 0; LastSwingResult = "出刀中";
+            if (swingBody != null) swingBody.BeginSwing(dur, false);
+            var swingAudio = AudioDirector.Instance;
+            if (swingAudio != null) swingAudio.Play(SfxId.SlashSwing, 0.62f, Random.Range(0.94f, 1.06f));
+        }
+
+        void ResolveSwingHit(int step, float dmgMul, float dur)
+        {
 
             var targets = CollectTargets();
             LastSwingTargets = targets.Count;
@@ -270,8 +312,6 @@ namespace MedusaHorror.Player
             {
                 LastSwingDamage = 0f;
                 LastSwingResult = "挥空";
-                if (swingBody != null) swingBody.BeginSwing(dur, false);
-                if (audio != null) audio.Play(SfxId.SlashSwing, 0.62f, Random.Range(0.94f, 1.06f));
                 if (hud != null) hud.ShowSwingResult("挥空", false);
                 return;
             }
@@ -299,7 +339,6 @@ namespace MedusaHorror.Player
             LastSwingResult = hitCount > 0
                 ? ("第 " + (step + 1) + " 段 · 命中 " + hitCount + " 个目标 · " + dealt.ToString("0") + " 伤害")
                 : "挥空";
-            if (swingBody != null) swingBody.BeginSwing(dur, hitCount > 0);
 
             if (audio != null)
             {
@@ -429,7 +468,9 @@ namespace MedusaHorror.Player
             if (!_bladeCaptured) CaptureBlade();
 
             _swingElapsed += Time.deltaTime;
-            float u = Mathf.Clamp01(_swingElapsed / _activeSwingDuration);
+            if (_trail != null && _swingElapsed >= _activeSwingDuration) _trail.emitting = false;
+            float u = _swingElapsed < _activeSwingDuration ? .58f * _swingElapsed / _activeSwingDuration
+                : .58f + .42f * Mathf.Clamp01((_swingElapsed - _activeSwingDuration) / RecoveryDuration);
             bool hold = false;
 #if UNITY_EDITOR || MARVIS_DEBUG
             if (debugHoldPhase >= 0f) { u = Mathf.Clamp01(debugHoldPhase); hold = true; }
@@ -530,6 +571,8 @@ namespace MedusaHorror.Player
             else if (bladeRoot != null) bladeRoot.gameObject.SetActive(active);
             if (!active)
             {
+                _holdChain = false;
+                _hitPending = false;
                 if (_trail != null) _trail.emitting = false;
                 _swingElapsed = -1f;
                 if (swingBody != null) swingBody.Cancel();

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -25,15 +25,6 @@ namespace MedusaHorror.Core
         Text _tipText;
         Text _sceneText;
 
-        static readonly string[] Tips =
-        {
-            "消毒水的气味还没散尽……",
-            "别回头，走廊尽头有东西在动。",
-            "手电电量有限，省着用。",
-            "石门之后，是另一片废墟。",
-            "她的眼睛，不要看。"
-        };
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Boot()
         {
@@ -48,6 +39,10 @@ namespace MedusaHorror.Core
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
             IsLoading = false;
+        }
+        void LateUpdate()
+        {
+            if (IsLoading) MedusaHorror.Player.InputReader.blocked = true;
         }
 
         /// <summary>异步加载目标场景；sceneName 不在 Build Settings 中时回退主菜单。</summary>
@@ -72,9 +67,14 @@ namespace MedusaHorror.Core
                 }
             }
 
+            string source = SceneManager.GetActiveScene().name;
+            if (!CampaignRoute.CanTravel(source, target, out var reason))
+            {
+                MedusaHorror.Gameplay.LootToast.Show(reason); return;
+            }
+            CampaignRoute.BeginTravel(source, target);
             // 记录进度落点：回主菜单时清空，避免"继续游戏"把玩家丢回菜单
-            if (target == GameFlow.MenuScene) SaveSystem.Data.lastScene = "";
-            else SaveSystem.Data.lastScene = target;
+            if (target != GameFlow.MenuScene) SaveSystem.Data.lastScene = target;
             SaveSystem.Save();
 
             Instance.StartCoroutine(Instance.LoadRoutine(target, tip));
@@ -84,22 +84,36 @@ namespace MedusaHorror.Core
         {
             IsLoading = true;
             Time.timeScale = 1f;
-            Build(tip, sceneName);
+            bool realityReturn = CampaignRoute.ReturnFromTrial;
+            bool wasBlocked = MedusaHorror.Player.InputReader.blocked;
+            MedusaHorror.Player.InputReader.blocked = true;
+            Build(realityReturn ? "" : tip, sceneName);
+            UI.RealityReturnEffect effect = null;
+            if (realityReturn)
+            {
+                foreach (Transform child in _canvas.transform) child.gameObject.SetActive(false);
+                var go = new GameObject("RealityReturn", typeof(RectTransform));
+                effect = go.AddComponent<UI.RealityReturnEffect>(); effect.Build(_canvas.transform);
+                var rt = go.GetComponent<RectTransform>(); rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
+            }
 
             var op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
             if (op == null)
             {
                 Debug.LogError("[SceneLoader] LoadSceneAsync 返回空: " + sceneName);
                 Teardown();
+                MedusaHorror.Player.InputReader.blocked = wasBlocked;
                 IsLoading = false;
                 yield break;
             }
             op.allowSceneActivation = false;
 
             float t = 0f;
-            while (t < minShowTime)
+            float minimum = realityReturn ? 4.2f : minShowTime;
+            while (t < minimum)
             {
-                t += Time.unscaledDeltaTime;
+                t += Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+                if (effect != null) effect.Tick(t);
                 SetProgress(Mathf.Clamp01(op.progress / 0.9f) * 0.9f + 0.1f * Mathf.Clamp01(t / minShowTime));
                 yield return null;
             }
@@ -117,7 +131,13 @@ namespace MedusaHorror.Core
             op.allowSceneActivation = true;
             while (!op.isDone) yield return null;
 
+            if (effect != null)
+            {
+                float reveal = 0;
+                while (reveal < 1.6f) { reveal += Mathf.Min(Time.unscaledDeltaTime, 0.1f); effect.Reveal(reveal / 1.6f); yield return null; }
+            }
             Teardown();
+            MedusaHorror.Player.InputReader.blocked = false;
             IsLoading = false;
         }
 
@@ -216,15 +236,17 @@ namespace MedusaHorror.Core
             trt.anchoredPosition = new Vector2(0f, 120f);
             trt.sizeDelta = new Vector2(1100f, 40f);
             _tipText.alignment = TextAnchor.MiddleCenter;
-            _tipText.text = string.IsNullOrEmpty(tip) ? Tips[Random.Range(0, Tips.Length)] : tip;
+            _tipText.text = !string.IsNullOrEmpty(tip) ? tip : sceneName == CampaignRoute.Trial ? "记忆仍然模糊，先留意身边能用的东西。" : sceneName == CampaignRoute.City ? "高墙内可以休整，离城前记得确认补给。" : "留意周围的道路，记住返回安全区的方向。";
         }
 
         public static string DisplayName(string scene)
         {
             switch (scene)
             {
-                case "W0_Base": return "中继站";
-                case "W2_Wasteland": return "W2 · 荒废村庄";
+                case "W0_Base": return "保安队训练场";
+                case "W1_Hospital": return "无名医院";
+                case "W2_Stronghold": return "荒原堡垒";
+                case "W2_Wasteland": return "野外 · 旧村庄";
                 case "W3_Subway": return "W3 · 地下铁";
                 case "W4_NeonStreet": return "W4 · 霓虹街区";
                 case "W5_AlienGate": return "W5 · 外星星门";

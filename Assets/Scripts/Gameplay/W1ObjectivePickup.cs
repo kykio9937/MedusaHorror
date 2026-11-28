@@ -19,7 +19,7 @@ namespace MedusaHorror.Gameplay
             if (Count < Total) return;
             var portals = Object.FindObjectsOfType<MedusaHorror.Gameplay.ExitPortal>(true);
             foreach (var p in portals) p.requireActivation = false;
-            LootToast.Show("五件训练凭证已齐 · 北侧二楼通道开放");
+            LootToast.Show("物品已集齐 · 对照西侧病历与东侧配电记录，打开北侧通道");
         }
     }
 
@@ -41,6 +41,12 @@ namespace MedusaHorror.Gameplay
             transform.Rotate(Vector3.up, spinSpeed * Time.deltaTime, Space.World);
         }
 
+        public void RestoreCollected()
+        {
+            _taken=true;W1ObjectiveState.Collect(label);
+            if(goal!=null&&goal.owner!=null)goal.owner.CompletePoint(goal);
+            gameObject.SetActive(false);
+        }
         public void Interact()
         {
             if (!CanInteract) return;
@@ -49,7 +55,7 @@ namespace MedusaHorror.Gameplay
             if (goal != null && goal.owner != null) goal.owner.CompletePoint(goal);
             string id = "hospital_clue_" + label;
             if (MedusaHorror.Core.Inventory.Count(id) == 0)
-                MedusaHorror.Core.Inventory.Add(id, label, 1, "在医院发现的关键线索。集齐五件后可启动离场星门。", "任务");
+                MedusaHorror.Core.Inventory.Add(id, label, 1, "在医院发现的关键线索。结合其他线索可打开北侧通道。", "任务");
             gameObject.SetActive(false);
         }
     }

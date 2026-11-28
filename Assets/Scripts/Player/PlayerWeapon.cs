@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using MedusaHorror.Gameplay;
 
@@ -89,6 +89,7 @@ namespace MedusaHorror.Player
         public int AmmoInMagazine { get { return _ammo; } }
         public int MagazineSize { get { return magazineSize; } }
         public int ReserveAmmo { get { return reserveAmmo; } }
+        public void RestoreAmmo(int magazine,int reserve){_ammo=Mathf.Clamp(magazine,0,magazineSize);reserveAmmo=Mathf.Max(0,reserve);_reloadElapsed=-1;}
         public bool IsReloading { get { return _reloadElapsed >= 0f; } }
         public float SpreadDegrees { get { return _spread; } }
         public int ShotsFired { get; private set; }
@@ -378,7 +379,7 @@ namespace MedusaHorror.Player
                     Vector3 aimPoint = viewCamera.transform.position + viewCamera.transform.forward * range;
                     _holder.rotation = Quaternion.LookRotation(aimPoint - _holder.position, transform.up) *
                         Quaternion.Euler(-7.5f * _recoilKick, 0f, 0f);
-                    if (_loadout != null && _loadout.IsSwitching)
+                    if (_loadout != null && _loadout.IsSwitching && GetComponentInParent<FirstPersonArms>() == null)
                     {
                         float stow = _loadout.StowAmount;
                         _holder.position += viewCamera.transform.TransformVector(new Vector3(0.10f, -0.65f, -0.18f)) * stow;
@@ -443,6 +444,7 @@ namespace MedusaHorror.Player
 
         void TryFire()
         {
+            if (!PlayerViewMode.IsFirstPerson) return;
             if (_loadout != null && (_loadout.IsSwitching || !inputEnabled)) return;
             if (_reloadElapsed >= 0f) return;
 

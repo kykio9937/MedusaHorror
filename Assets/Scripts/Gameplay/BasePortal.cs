@@ -40,6 +40,8 @@ namespace MedusaHorror.Gameplay
             if (dx * dx + dz * dz > radius * radius) return;
             if (Mathf.Abs(a.y - b.y) > 2.5f) return;
 
+            if (!MedusaHorror.Core.CampaignRoute.CanTravel(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name, targetScene, out var reason))
+            { _cd = cooldown; LootToast.Show(reason); return; }
             _cd = cooldown;
             LootToast.Show(prompt + " · " + targetScene);
             Debug.Log("[BasePortal] " + name + " 触发 → " + targetScene);

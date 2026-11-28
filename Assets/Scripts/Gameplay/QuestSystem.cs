@@ -25,6 +25,7 @@ namespace MedusaHorror.Gameplay
         public string targetTag = "";
         public int need = 3;
         public int rewardCoins = 100;
+        public int rewardXp = 80;
         public float rewardSpeed = 0f;
         public float rewardDamage = 0f;
         public float rewardPetrify = 0f;
@@ -167,6 +168,7 @@ namespace MedusaHorror.Gameplay
             s.completed = true;
 
             Wallet.Add(d.rewardCoins);
+            Progression.AddXp(Mathf.Max(0, d.rewardXp));
             if (d.rewardSpeed > 0f) PlayerStats.AddSpeed(d.rewardSpeed);
             if (d.rewardDamage > 0f) PlayerStats.AddDamage(d.rewardDamage);
             if (d.rewardPetrify > 0f) PlayerStats.AddPetrifyResist(d.rewardPetrify);

@@ -64,6 +64,8 @@ namespace MedusaHorror.Player
         WeaponKind _pendingWeapon;
         string _pendingSource;
         public bool IsSwitching { get; private set; }
+        public float SwitchElapsed => _switchElapsed;
+        public bool SwitchHasSwapped => _swapped;
         public float StowAmount => !IsSwitching ? 0f : (_swapped
             ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_switchElapsed - StowDuration) / (SwitchDuration - StowDuration)))
             : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_switchElapsed / StowDuration)));
@@ -279,6 +281,7 @@ namespace MedusaHorror.Player
                 source = source + "→回落剑";
             }
 
+            if (kind != WeaponKind.Sword) PlayerViewMode.RequireFirstPerson();
             EnsureRifle();
             if (_equipped && kind != Current)
             {

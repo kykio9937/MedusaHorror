@@ -95,7 +95,7 @@ namespace MedusaHorror.EditorTools
                 if(m==null){m=new Material(baseMaterial);AssetDatabase.CreateAsset(m,path);}
                 m.mainTextureScale=new Vector2(Mathf.Max(1,r.transform.localScale.x/3),Mathf.Max(1,r.transform.localScale.z/3));r.sharedMaterial=m;
             }
-            var sign=expansion.transform.Find("SimulationExitStory");if(sign!=null){sign.position=new Vector3(0,19,104);sign.GetChild(0).localScale=new Vector3(0.2f,1.25f,20);}
+            var sign=expansion.transform.Find("SimulationExitStory");if(sign!=null)sign.position=new Vector3(0,16.5f,104);
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());AssetDatabase.SaveAssets();
         }
         public static void BakeOpenRoutes()
@@ -126,9 +126,9 @@ namespace MedusaHorror.EditorTools
         }
         static void Sign(string name,string text,Vector3 position,float yaw=0,float width=4)
         {
-            var panel=Box(name,position,new Vector3(width,0.8f,0.05f),trim,false);panel.transform.rotation=Quaternion.Euler(0,yaw,0);
-            var go=new GameObject("Text");go.transform.SetParent(panel.transform,false);go.transform.localPosition=new Vector3(0,0,-0.7f);go.transform.localScale=new Vector3(1/width,1/0.8f,20);
-            var t=go.AddComponent<TextMesh>();t.text=text;t.font=CjkFont.Get();t.fontSize=60;t.characterSize=0.045f;t.anchor=TextAnchor.MiddleCenter;t.alignment=TextAlignment.Center;t.color=new Color(0.8f,0.96f,0.94f);go.AddComponent<WorldSignText>();
+            var go=new GameObject(name);go.transform.SetParent(root,false);go.transform.position=position;
+            var lines=text.Split('\n');var notice=go.AddComponent<ProximityNotice>();
+            notice.title=lines[0];notice.description=string.Join("\n",lines.Skip(1));notice.radius=5;notice.verticalOffset=2.5f;
         }
         static void LightAt(Vector3 position,float range=12)
         {

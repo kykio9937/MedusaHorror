@@ -14,6 +14,12 @@ def edit(relative, transform):
     if updated != text:
         path.write_bytes((b'\xef\xbb\xbf' if raw.startswith(b'\xef\xbb\xbf') else b'') + updated.encode('utf-8'))
         changed.append(relative)
+
+# 第一人称手臂需要读取原角色网格；素材目录被忽略，重新导入时一并恢复设置。
+for model in ['Assets/Suriyun/Kazuko/FBX/Kazuko.fbx.meta',
+              'Assets/Suriyun/Kazuko/FBX/Kazuko_bikini.fbx.meta',
+              'Assets/AscendantOne/Aphrodite/Aphrodite.fbx.meta']:
+    edit(model, lambda s: s.replace('isReadable: 0', 'isReadable: 1'))
 def image_effects(text):
     # supportsImageEffects is always true in Unity 2022.
     text = re.sub(r'(?m)^[ \t]*// Disable if we don.t support image effects\r?\n', '', text)

@@ -17,7 +17,7 @@ namespace MedusaHorror.UI
     [DisallowMultipleComponent]
     public class MainMenuScreen : MonoBehaviour
     {
-        public string gameScene = "W0_Base";
+        public string gameScene = "W1_Hospital";
 
         /// <summary>编辑器诊断用的一次性「开始」脉冲（读取后自动清零）。</summary>
         public static bool debugStartPulse;
@@ -148,7 +148,7 @@ namespace MedusaHorror.UI
             var sImg = scan.gameObject.AddComponent<Image>();
             sImg.sprite = ScanlineSprite();
             sImg.type = Image.Type.Simple;
-            sImg.color = new Color(1f, 1f, 1f, 0.55f);
+            sImg.color = new Color(1f, 1f, 1f, 0.07f);
             sImg.raycastTarget = false;
 
             _glitchBars = new RectTransform[4];
@@ -287,6 +287,8 @@ namespace MedusaHorror.UI
 
         // ------------------------------------------------------------------ 每帧
 
+        float _skinTimer; int _skinCount=-1;
+        void LateUpdate(){_skinTimer-=Time.unscaledDeltaTime;if(_skinTimer<=0){_skinTimer=0.5f;if(_canvas!=null){int count=_canvas.GetComponentsInChildren<Button>(true).Length;if(count!=_skinCount){_skinCount=count;MenuTheme.Apply(_canvas.GetComponent<RectTransform>());}}}}
         void Update()
         {
             AnimateBackground();
@@ -450,9 +452,9 @@ namespace MedusaHorror.UI
                     else
                     {
                         var info = MedusaHorror.Core.SaveSystem.GetSlotInfo(latest);
-                        label = Application.CanStreamedLevelBeLoaded(info.sceneName)
+                        label = Application.CanStreamedLevelBeLoaded(info.scene)
                             ? "继续游戏 — " + info.sceneName
-                            : "继续游戏 — 从基地开始";
+                            : "继续游戏 — 读取安全检查点";
                     }
                 }
 
@@ -491,6 +493,7 @@ namespace MedusaHorror.UI
         void ContinueGame()
         {
             string scene = MedusaHorror.Core.SaveSystem.ContinueLatest();
+            if(MedusaHorror.Core.CheckpointSystem.HasCheckpoint){MedusaHorror.Core.CheckpointSystem.Load();return;}
             if (string.IsNullOrEmpty(scene))
             {
                 Debug.Log("[MainMenu] 没有可继续的存档");
@@ -540,6 +543,7 @@ namespace MedusaHorror.UI
 
         void RebuildPanel()
         {
+            _skinCount=-1;
             if (_panelRoot != null)
             {
                 _panelRoot.gameObject.SetActive(false);
@@ -810,7 +814,7 @@ namespace MedusaHorror.UI
                 _pendingDelete = -1;
                 PlayUi();
                 MedusaHorror.Core.SaveSystem.StartNewGame(slot);
-                LoadScene(gameScene);
+                LoadScene(MedusaHorror.Core.CampaignRoute.Trial);
                 return;
             }
 
@@ -822,6 +826,7 @@ namespace MedusaHorror.UI
             }
             PlayUi();
             MedusaHorror.Core.SaveSystem.SetCurrentSlot(slot);
+            if(MedusaHorror.Core.CheckpointSystem.HasCheckpoint){MedusaHorror.Core.CheckpointSystem.Load();return;}
             LoadScene(string.IsNullOrEmpty(info.scene) ? gameScene : info.scene);
         }
 

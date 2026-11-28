@@ -136,7 +136,7 @@ namespace MedusaHorror.Gameplay
             {
                 if (QuestSystem.Claim(def.id))
                 {
-                    var reward = "+" + def.rewardCoins + " 信用点";
+                    var reward = "+" + def.rewardCoins + " 信用点 · 经验 +" + def.rewardXp;
                     if (def.rewardSpeed > 0f) reward += " · 移速 +" + Mathf.RoundToInt(def.rewardSpeed * 100f) + "%";
                     if (def.rewardDamage > 0f) reward += " · 攻击 +" + Mathf.RoundToInt(def.rewardDamage * 100f) + "%";
                     if (def.rewardPetrify > 0f) reward += " · 石化抗性 +" + Mathf.RoundToInt(def.rewardPetrify * 100f) + "%";

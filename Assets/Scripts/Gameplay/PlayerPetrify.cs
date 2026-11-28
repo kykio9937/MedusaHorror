@@ -1,4 +1,4 @@
-﻿using MedusaHorror.Player;
+using MedusaHorror.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -107,6 +107,14 @@ namespace MedusaHorror.Gameplay
             lastRate = 0f;
         }
 
+        float _incomingTotal,_incomingUntil;
+        public void ApplyImpact(float amount)
+        {
+            if(dead||petrified||amount<=0)return;
+            float actual=Mathf.Min(maxValue-value,amount*(1-MedusaHorror.Core.PlayerStats.PetrifyResist));
+            value+=actual;hurtFlash=1;MedusaHorror.UI.CombatNumbers.Show(transform.position,actual,true);
+            if(value>=maxValue)EnterPetrified();
+        }
         public void ApplyGaze(float weightedRate, float dt)
         {
             if (petrified) return;
@@ -118,6 +126,8 @@ namespace MedusaHorror.Gameplay
             float before = value;
             value = Mathf.Min(maxValue, value + weightedRate * dt * resistScale);
             if (weightedRate > 0f && value - before > 0.55f) hurtFlash = 1f;
+            _incomingTotal+=Mathf.Max(0,value-before);
+            if(Time.time>=_incomingUntil&&_incomingTotal>0.1f){MedusaHorror.UI.CombatNumbers.Show(transform.position,_incomingTotal,true);_incomingTotal=0;_incomingUntil=Time.time+0.5f;}
             if (value >= maxValue) EnterPetrified();
         }
 

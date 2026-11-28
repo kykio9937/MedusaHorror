@@ -29,6 +29,7 @@ namespace MedusaHorror.Player
         public static bool debugOverrideEnabled;
         public static Vector2 debugMove;
         public static bool debugFire;
+        public static bool debugFireHeld;
         public static bool debugRun;
         public static bool debugAim;
         public bool AimHeld { get; private set; }
@@ -54,6 +55,7 @@ namespace MedusaHorror.Player
 
         /// <summary>本帧是否按下开火键（鼠标左键，仅在光标锁定时有效）</summary>
         public bool FirePressed { get; private set; }
+        public bool FireHeld { get; private set; }
 
         /// <summary>本帧是否按下换弹键（R）。</summary>
         public bool ReloadPressed { get; private set; }
@@ -107,6 +109,7 @@ namespace MedusaHorror.Player
             bool jump = false;
             bool interact = false;
             bool fire = false;
+            bool fireHeld = false;
             bool reload = false;
             bool w1 = false;
             bool w2 = false;
@@ -123,6 +126,7 @@ namespace MedusaHorror.Player
                 run = debugRun;
                 aim = debugAim;
                 fire = debugFire;
+                fireHeld = debugFireHeld;
                 reload = debugReload || debugReloadPulse;
                 interact = debugInteractPulse;
                 if (debugSwitchPulse == 0) { w1 = true; swap = true; }
@@ -160,6 +164,7 @@ namespace MedusaHorror.Player
 
             if (ms != null)
             {
+                fireHeld = ms.leftButton.isPressed && Cursor.lockState == CursorLockMode.Locked;
                 aim = ms.rightButton.isPressed && Cursor.lockState == CursorLockMode.Locked;
                 Vector2 delta = ms.delta.ReadValue();
                 look = new Vector2(delta.x, delta.y) * lookSensitivity;
@@ -181,6 +186,7 @@ namespace MedusaHorror.Player
                 run = jump = interact = fire = reload = w1 = w2 = w3 = swap = false;
                 sk1 = sk2 = false;
                 aim = false;
+                fireHeld = false;
             }
 
             if (move.sqrMagnitude > 1f) move.Normalize();
@@ -192,6 +198,7 @@ namespace MedusaHorror.Player
             JumpPressed = jump;
             InteractPressed = interact;
             FirePressed = fire;
+            FireHeld = fireHeld;
             ReloadPressed = reload;
             Weapon1Pressed = w1;
             Weapon2Pressed = w2;

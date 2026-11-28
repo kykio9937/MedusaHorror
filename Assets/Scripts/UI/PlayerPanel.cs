@@ -110,7 +110,7 @@ namespace MedusaHorror.UI
 #endif
         }
 
-        static readonly string[] PageNames = { "属性", "装备", "背包", "帮助" };
+        static readonly string[] PageNames = { "属性", "装备", "背包", "帮助", "调查日志" };
         static readonly string[] BagFilters = { "全部", "消耗", "材料", "任务", "钥匙", "纪念" };
 
         public bool IsOpen { get { return _open; } }
@@ -380,6 +380,7 @@ namespace MedusaHorror.UI
                 case 1: return BuildEquipment();
                 case 2: return BuildInventory();
                 case 3: return BuildHelp();
+                case 4: return BuildJournal();
                 default: return BuildStats();
             }
         }
@@ -400,6 +401,20 @@ namespace MedusaHorror.UI
             return n;
         }
 
+        string BuildJournal()
+        {
+            var sb=new StringBuilder("调查日志\n\n");
+            if(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name==CampaignRoute.Trial)
+            {
+                sb.AppendLine("当前线索 "+W1ObjectiveState.Count+"/5");
+                sb.AppendLine(HospitalExploration.NorthRouteReady?"两份记录已对照：集齐部件后前往北侧楼梯。":HospitalExploration.MissingRouteHint+"。");
+                sb.AppendLine("调查台靠近按 E；安全终端或 Esc 菜单可保存检查点。\n");
+            }
+            var journal=SaveSystem.Data.hospitalJournal;
+            if(journal==null||journal.Count==0)sb.AppendLine("还没有调查记录。留意房间里的旧文件和终端。");
+            else foreach(var entry in journal){int split=entry.IndexOf('|');sb.AppendLine(split>=0?entry.Substring(split+1):entry);sb.AppendLine();}
+            return sb.ToString();
+        }
         string BuildStats()
         {
             var d = SaveSystem.Data;
@@ -485,7 +500,7 @@ namespace MedusaHorror.UI
             sb.AppendLine("已装强化 / 义体（" + owned.Count + " 件）");
             if (owned.Count == 0)
             {
-                sb.AppendLine("  还没有装任何强化，去霓虹街区的武器店和义体门诊看看。");
+                sb.AppendLine("  还没有装任何强化。先留意眼前能够找到的物资。");
             }
             else
             {
@@ -565,6 +580,7 @@ namespace MedusaHorror.UI
             sb.AppendLine("Shift        奔跑");
             sb.AppendLine("空格         跳跃（购买义体后可二段跳）");
             sb.AppendLine("鼠标         视角 / 转身");
+            sb.AppendLine("T            切换视角（10级后在训练场解锁，医院固定第一人称）");
             sb.AppendLine("鼠标左键     攻击 / 射击");
             sb.AppendLine("鼠标右键     按住瞄准（持枪时）");
             sb.AppendLine("R            换弹");

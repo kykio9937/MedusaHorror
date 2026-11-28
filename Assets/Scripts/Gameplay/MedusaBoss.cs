@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 namespace MedusaHorror.Gameplay
@@ -254,6 +254,7 @@ namespace MedusaHorror.Gameplay
             if (Current == State.Dead || amount <= 0f) return;
             if (Current == State.Dormant) { lastWake = "damage"; Wake(); }
 
+            MedusaHorror.UI.CombatNumbers.Show(transform.position+Vector3.up*1.6f,Mathf.Min(Health,amount));
             Health = Mathf.Max(0f, Health - amount);
             _hitFlash = 0.12f;
             HitFeedbackFx();   // 受击反馈：白闪 / 命中粒子 / 短距击退抖动 / 音效叠层（不改变任何战斗数值）
@@ -302,7 +303,7 @@ namespace MedusaHorror.Gameplay
                     var pet = player.GetComponentInParent<MedusaHorror.Gameplay.PlayerPetrify>();
                     if (pet != null && !pet.dead)
                     {
-                        pet.value = Mathf.Min(pet.maxValue, pet.value + pulsePetrify);
+                        pet.ApplyImpact(pulsePetrify);
                         pet.lastRate = pulsePetrify;
                     }
                     var cs = FindObjectOfType<MedusaHorror.Player.CameraShake>();
@@ -418,7 +419,7 @@ namespace MedusaHorror.Gameplay
             {
                 var r = _renderers[i];
                 if (r == null) continue;
-                var mats = r.sharedMaterials;
+                var mats = r.materials;
                 for (int m = 0; m < mats.Length; m++)
                 {
                     if (mats[m] == null || !mats[m].HasProperty("_Color")) continue;

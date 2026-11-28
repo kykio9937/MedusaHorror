@@ -171,6 +171,7 @@ namespace MedusaHorror.Gameplay
             for (int i = 0; i < All.Length; i++)
             {
                 bool got = list.Contains(All[i].id);
+                if (!got && !SaveSystem.Data.captainBriefingDone) { sb.AppendLine("？ 未知成就"); continue; }
                 sb.Append(got ? "◆ " : "◇ ")
                   .Append(All[i].name)
                   .Append("　—　")
